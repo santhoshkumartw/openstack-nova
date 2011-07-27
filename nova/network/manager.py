@@ -606,31 +606,6 @@ class NetworkManager(manager.SchedulerDependentManager):
                 #             robust solution would be to make them uniq per ip
                 net['vpn_public_port'] = kwargs['vpn_start'] + index
 
-
-            # Populate the quantum network uuid if we have it.  We're
-            # currently using the bridge column for this since we don't have
-            # another place to put it.
-            if FLAGS.existing_uuid is not None:
-                try:
-                    network_exists = quantum.get_network(
-                      FLAGS.quantum_default_tenant_id, FLAGS.existing_uuid)
-                except:
-                    txt = "Unable to find quantum network with uuid: %s" % \
-                      (FLAGS.existing_uuid)
-                    raise Exception(txt)
-                net["bridge"] = FLAGS.existing_uuid
-
-            if kwargs.get("project_id", None) not in [None, "0"]:
-                project_id = kwargs["project_id"]
-                # We need to create the private network if it doesnt exist.
-                private_net_name = "%s_private" % (project_id)
-                net_uuid = quantum.get_network_by_name(project_id,
-                  private_net_name)
-                if not net_uuid:
-                    net_uuid = quantum.create_network(project_id,
-                      private_net_name)
-                net["bridge"] = net_uuid
-
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
 
@@ -743,6 +718,100 @@ class FlatManager(NetworkManager):
 
 
 class NetstackManager(FlatManager):
+    def create_networks(self, context, label, cidr, num_networks,
+                        network_size, cidr_v6, gateway_v6, bridge,
+                        bridge_interface, **kwargs):
+        """Create networks based on parameters."""
+        fixed_net = netaddr.IPNetwork(cidr)
+        fixed_net_v6 = netaddr.IPNetwork(cidr_v6)
+        significant_bits_v6 = 64
+        network_size_v6 = 1 << 64
+        count = 0
+        for index in range(num_networks):
+            start = index * network_size
+            start_v6 = index * network_size_v6
+            significant_bits = 32 - int(math.log(network_size, 2))
+            cidr = '%s/%s' % (fixed_net[start], significant_bits)
+            project_net = netaddr.IPNetwork(cidr)
+            net = {}
+            net['bridge'] = bridge
+            net['bridge_interface'] = bridge_interface
+            net['dns'] = FLAGS.flat_network_dns
+            net['cidr'] = cidr
+            net['netmask'] = str(project_net.netmask)
+            net['gateway'] = str(project_net[1])
+            net['broadcast'] = str(project_net.broadcast)
+            net['dhcp_start'] = str(project_net[2])
+            if kwargs["project_id"] not in [None, "0"]:
+                net['project_id'] = kwargs["project_id"]
+            count += 1
+            if num_networks > 1:
+                net['label'] = '%s_%d' % (label, index)
+            else:
+                net['label'] = label
+
+            if FLAGS.use_ipv6:
+                cidr_v6 = '%s/%s' % (fixed_net_v6[start_v6],
+                                     significant_bits_v6)
+                net['cidr_v6'] = cidr_v6
+
+                project_net_v6 = netaddr.IPNetwork(cidr_v6)
+
+                if gateway_v6:
+                    # use a pre-defined gateway if one is provided
+                    net['gateway_v6'] = str(gateway_v6)
+                else:
+                    net['gateway_v6'] = str(project_net_v6[1])
+
+                net['netmask_v6'] = str(project_net_v6._prefixlen)
+
+            if kwargs.get('vpn', False):
+                # this bit here is for vlan-manager
+                del net['dns']
+                vlan = kwargs['vlan_start'] + index
+                net['vpn_private_address'] = str(project_net[2])
+                net['dhcp_start'] = str(project_net[3])
+                net['vlan'] = vlan
+                net['bridge'] = 'br%s' % vlan
+
+                # NOTE(vish): This makes ports unique accross the cloud, a more
+                #             robust solution would be to make them uniq per ip
+                net['vpn_public_port'] = kwargs['vpn_start'] + index
+
+            # Populate the quantum network uuid if we have it.  We're
+            # currently using the bridge column for this since we don't have
+            # another place to put it.
+            if FLAGS.existing_uuid is not None:
+                try:
+                    network_exists = quantum.get_network(
+                      FLAGS.quantum_default_tenant_id, FLAGS.existing_uuid)
+                except:
+                    txt = "Unable to find quantum network with uuid: %s" % \
+                      (FLAGS.existing_uuid)
+                    raise Exception(txt)
+                net["bridge"] = FLAGS.existing_uuid
+
+            if kwargs.get("project_id", None) not in [None, "0"]:
+                project_id = kwargs["project_id"]
+                # We need to create the private network if it doesnt exist.
+                private_net_name = "%s_private" % (project_id)
+                net_uuid = quantum.get_network_by_name(project_id,
+                  private_net_name)
+                if not net_uuid:
+                    net_uuid = quantum.create_network(project_id,
+                      private_net_name)
+                net["bridge"] = net_uuid
+
+            # None if network with cidr or cidr_v6 already exists
+            network = self.db.network_create_safe(context, net)
+
+            if network:
+                self._create_fixed_ips(context, network['id'])
+            else:
+                raise ValueError(_('Network with cidr %s already exists') %
+                                   cidr)
+
+
     def _allocate_fixed_ips(self, context, instance_id, networks):
         for network in networks:
             self.allocate_fixed_ip(context, instance_id, network)
