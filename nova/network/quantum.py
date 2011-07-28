@@ -80,7 +80,8 @@ def get_network_by_name(tenant_id, network_name):
     res = get_connection().do_request(tenant_id, 'GET', "/networks." + FORMAT)
     resdict = json.loads(res.read())
     LOG.debug(resdict)
-    LOG.info("(tenant_id: %s) Looking for name: %s" % (tenant_id, network_name))
+    LOG.debug("(tenant_id: %s) Looking for name: %s" % (tenant_id,
+      network_name))
     for n in resdict["networks"]:
         net_id = n["id"]
         res = get_connection().do_request(tenant_id, 'GET',

@@ -125,6 +125,8 @@ class NetstackManager(manager.FlatManager):
                     net_uuid = quantum.create_network(project_id,
                       private_net_name)
                 net["bridge"] = net_uuid
+                LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
+                  private_net_name, net_uuid)))
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
@@ -151,7 +153,7 @@ class NetstackManager(manager.FlatManager):
         # that we'll use to order them.  To remove a network as a potential
         # candidate just make its priority NULL (or 0).
 
-        LOG.debug("Current project id: %s" % project_id)
+        LOG.debug(("Current project id: %s" % project_id))
 
         # Filter out any vlan networks and any networks that don't have the
         # host set
