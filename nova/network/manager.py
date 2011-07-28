@@ -570,7 +570,7 @@ class NetworkManager(manager.SchedulerDependentManager):
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
-            if kwargs["project_id"] not in [None, "0"]:
+            if kwargs.get("project_id", None) not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
             count += 1
             if num_networks > 1:
@@ -742,7 +742,7 @@ class NetstackManager(FlatManager):
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
-            if kwargs["project_id"] not in [None, "0"]:
+            if kwargs.get("project_id", None) not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
             count += 1
             if num_networks > 1:
