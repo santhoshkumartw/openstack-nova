@@ -65,6 +65,7 @@ class NetstackManager(manager.FlatManager):
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
+            net['priority'] = kwargs.get("priority", None)
             if kwargs["project_id"] not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
             count += 1
@@ -144,11 +145,11 @@ class NetstackManager(manager.FlatManager):
         networks = self.db.network_get_all(context)
 
         # We want to construct something like:
-        #   networks = [private_network, public_network, service_network]
+        #   networks = [private_network, other nets ordered by priority]
         # The private network will be the one matching the project id.  The
-        # public and service networks will be the networks without an assigned
-        # project_id; but if there is more than two of these then we'll have
-        # to try to match on the network_tag.
+        # others will be networks with no project_id but with a priority key
+        # that we'll use to order them.  To remove a network as a potential
+        # candidate just make its priority NULL (or 0).
 
         LOG.debug("Current project id: %s" % project_id)
 
@@ -164,18 +165,25 @@ class NetstackManager(manager.FlatManager):
             raise Exception("Unable to find private network for project: %s" % (project_id))
 
         LOG.debug(_("Found private network: %s" % private_network))
-        try:
-            public_network = [network for network in networks if
-              network['project_id'] == None and "public" in network['label']][0]
-        except:
-            raise Exception("Unable to find network with name \"public\"")
-        try:
-            service_network = [network for network in networks if
-              network['project_id'] == None and "service" in network['label']][0]
-        except:
-            raise Exception("Unable to find network with name \"service\"")
 
-        return [private_network, public_network, service_network]
+        result = [private_network]
+        # Filter out any networks without a priority
+        networks_with_pri = []
+        for x in networks:
+            pri = 0
+            try:
+                pri = int(x["priority"])
+            except:
+                continue
+            if pri == 0:
+                continue
+            networks_with_pri.append(x)
+            LOG.debug(_("Found network with priority %d: %s" % (pri,
+              x["label"])))
+        networks_with_pri.sort(key=lambda x: x["priority"])
+        for x in networks_with_pri:
+            result.append(x)
+        return result
 
     def allocate_for_instance(self, context, **kwargs):
         """Handles allocating the various network resources for an instance.

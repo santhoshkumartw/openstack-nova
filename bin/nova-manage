@@ -97,7 +97,6 @@ flags.DECLARE('vlan_start', 'nova.network.manager')
 flags.DECLARE('vpn_start', 'nova.network.manager')
 flags.DECLARE('fixed_range_v6', 'nova.network.manager')
 flags.DECLARE('gateway_v6', 'nova.network.manager')
-flags.DECLARE('existing_uuid', 'nova.network.manager')
 flags.DECLARE('libvirt_type', 'nova.virt.libvirt.connection')
 flags.DEFINE_flag(flags.HelpFlag())
 flags.DEFINE_flag(flags.HelpshortFlag())
@@ -562,15 +561,15 @@ class NetworkCommands(object):
                network_size=None, vlan_start=None,
                vpn_start=None, fixed_range_v6=None, gateway_v6=None,
                flat_network_bridge=None, bridge_interface=None,
-               project_id=None):
+               project_id=None, priority=None):
         """Creates fixed ips for host by range
         arguments: label, fixed_range, [num_networks=FLAG],
                    [network_size=FLAG], [vlan_start=FLAG],
                    [vpn_start=FLAG], [fixed_range_v6=FLAG], [gateway_v6=FLAG],
                    [flat_network_bridge=FLAG], [bridge_interface=FLAG],
-                   [project_id=FLAG]
+                   [project_id=FLAG], [priority=FLAG]
         If you wish to use a later argument fill in the gaps with 0s
-        Ex: network create private 10.0.0.0/8 1 15 0 0 0 0 xenbr1 eth1 <project_id> <quantum network uuid>"
+        Ex: network create private 10.0.0.0/8 1 15 0 0 0 0 xenbr1 eth1 project_id priority"
             network create private 10.0.0.0/8 1 15
         """
         if not label:
@@ -612,7 +611,8 @@ class NetworkCommands(object):
                                         cidr_v6=fixed_range_v6,
                                         gateway_v6=gateway_v6,
                                         bridge=flat_network_bridge,
-                                        bridge_interface=bridge_interface)
+                                        bridge_interface=bridge_interface,
+                                        priority=priority)
         except ValueError, e:
             print e
             raise e
