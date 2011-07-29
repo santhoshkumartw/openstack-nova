@@ -115,18 +115,20 @@ class NetstackManager(manager.FlatManager):
                     raise Exception(txt)
                 net["bridge"] = FLAGS.existing_uuid
 
-            if kwargs.get("project_id", None) not in [None, "0"]:
-                project_id = kwargs["project_id"]
-                # We need to create the private network if it doesnt exist.
-                private_net_name = "%s_private" % (project_id)
-                net_uuid = quantum.get_network_by_name(project_id,
-                  private_net_name)
-                if not net_uuid:
-                    net_uuid = quantum.create_network(project_id,
+                # If the uuid wasn't provided and the project is specified
+                # then we should try to create this network via quantum.
+                if kwargs.get("project_id", None) not in [None, "0"]:
+                    project_id = kwargs["project_id"]
+                    # We need to create the private network if it doesnt exist.
+                    private_net_name = "%s_private" % (project_id)
+                    net_uuid = quantum.get_network_by_name(project_id,
                       private_net_name)
-                net["bridge"] = net_uuid
-                LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
-                  private_net_name, net_uuid)))
+                    if not net_uuid:
+                        net_uuid = quantum.create_network(project_id,
+                          private_net_name)
+                    net["bridge"] = net_uuid
+                    LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
+                      private_net_name, net_uuid)))
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
