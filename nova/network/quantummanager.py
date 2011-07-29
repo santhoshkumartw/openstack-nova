@@ -67,7 +67,7 @@ class QuantumManager(manager.FlatManager):
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
-            net['priority'] = kwargs.get("priority", None)
+            net['priority'] = int(kwargs.get("priority", 0))
             if kwargs["project_id"] not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
             if num_networks > 1:

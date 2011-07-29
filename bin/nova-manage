@@ -704,6 +704,8 @@ class NetworkCommands(object):
                 raise exception.NetworkNotCreated(req='with use_ipv6, '
                                                       '--gateway_v6')
 
+        if priority:
+            print "Creating network with priority: %d" % int(priority)
         # sanitize other input using FLAGS if necessary
         if not num_networks:
             num_networks = FLAGS.num_networks
