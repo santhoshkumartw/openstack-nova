@@ -41,26 +41,28 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('existing_uuid', None, 'Existing quantum network uuid')
 
 class NetstackManager(manager.FlatManager):
-    def create_networks(self, context, label, cidr, num_networks,
+    def create_networks(self, context, label, cidr, multi_host, num_networks,
                         network_size, cidr_v6, gateway_v6, bridge,
-                        bridge_interface, **kwargs):
+                        bridge_interface, dns1=None, dns2=None, **kwargs):
         """Create networks based on parameters."""
         fixed_net = netaddr.IPNetwork(cidr)
-        fixed_net_v6 = netaddr.IPNetwork(cidr_v6)
-        significant_bits_v6 = 64
-        network_size_v6 = 1 << 64
-        count = 0
+        if FLAGS.use_ipv6:
+            fixed_net_v6 = netaddr.IPNetwork(cidr_v6)
+            significant_bits_v6 = 64
+            network_size_v6 = 1 << 64
+
         for index in range(num_networks):
             start = index * network_size
-            start_v6 = index * network_size_v6
             significant_bits = 32 - int(math.log(network_size, 2))
             cidr = '%s/%s' % (fixed_net[start], significant_bits)
             project_net = netaddr.IPNetwork(cidr)
             net = {}
             net['bridge'] = bridge
             net['bridge_interface'] = bridge_interface
-            net['dns'] = FLAGS.flat_network_dns
+            net['dns1'] = dns1
+            net['dns2'] = dns2
             net['cidr'] = cidr
+            net['multi_host'] = multi_host
             net['netmask'] = str(project_net.netmask)
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
@@ -68,13 +70,13 @@ class NetstackManager(manager.FlatManager):
             net['priority'] = kwargs.get("priority", None)
             if kwargs["project_id"] not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
-            count += 1
             if num_networks > 1:
                 net['label'] = '%s_%d' % (label, index)
             else:
                 net['label'] = label
 
             if FLAGS.use_ipv6:
+                start_v6 = index * network_size_v6
                 cidr_v6 = '%s/%s' % (fixed_net_v6[start_v6],
                                      significant_bits_v6)
                 net['cidr_v6'] = cidr_v6
@@ -91,7 +93,8 @@ class NetstackManager(manager.FlatManager):
 
             if kwargs.get('vpn', False):
                 # this bit here is for vlan-manager
-                del net['dns']
+                del net['dns1']
+                del net['dns2']
                 vlan = kwargs['vlan_start'] + index
                 net['vpn_private_address'] = str(project_net[2])
                 net['dhcp_start'] = str(project_net[3])
@@ -114,7 +117,7 @@ class NetstackManager(manager.FlatManager):
                       (FLAGS.existing_uuid)
                     raise Exception(txt)
                 net["bridge"] = FLAGS.existing_uuid
-
+            else:
                 # If the uuid wasn't provided and the project is specified
                 # then we should try to create this network via quantum.
                 if kwargs.get("project_id", None) not in [None, "0"]:
@@ -140,7 +143,7 @@ class NetstackManager(manager.FlatManager):
                                    cidr)
 
 
-    def _allocate_fixed_ips(self, context, instance_id, networks):
+    def _allocate_fixed_ips(self, context, instance_id, host, networks):
         for network in networks:
             self.allocate_fixed_ip(context, instance_id, network)
 
@@ -195,14 +198,18 @@ class NetstackManager(manager.FlatManager):
         rpc.called by network_api
         """
         instance_id = kwargs.pop('instance_id')
+        host = kwargs.pop('host')
         project_id = kwargs.pop('project_id')
         type_id = kwargs.pop('instance_type_id')
+        vpn = kwargs.pop('vpn')
         admin_context = context.elevated()
         LOG.debug(_("network allocations for instance %s"), instance_id,
                                                             context=context)
         networks = self._get_networks_for_instance(admin_context, instance_id,
                                                                   project_id)
+        LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
-        self._allocate_fixed_ips(admin_context, instance_id, networks)
-        return self.get_instance_nw_info(context, instance_id, type_id)
+        self._allocate_fixed_ips(admin_context, instance_id, host, networks,
+          vpn=vpn)
+        return self.get_instance_nw_info(context, instance_id, type_id, host)
 
