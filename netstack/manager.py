@@ -143,7 +143,8 @@ class NetstackManager(manager.FlatManager):
                                    cidr)
 
 
-    def _allocate_fixed_ips(self, context, instance_id, host, networks):
+    def _allocate_fixed_ips(self, context, instance_id, host, networks,
+      **kwargs):
         for network in networks:
             self.allocate_fixed_ip(context, instance_id, network)
 
@@ -160,11 +161,11 @@ class NetstackManager(manager.FlatManager):
 
         LOG.debug(("Current project id: %s" % project_id))
 
-        # Filter out any vlan networks and any networks that don't have the
-        # host set
-        networks = [network for network in networks if
-                not network['vlan'] and network['host']]
+        # Filter out any vlan networks
+        networks = [network for network in networks if not network['vlan']]
 
+        for n in networks:
+            LOG.debug("%s (project: %s)" % (n["label"], n["project_id"]))
         try:
             private_network = [network for network in networks if
               network['project_id'] == project_id][0]
