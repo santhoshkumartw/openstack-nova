@@ -40,7 +40,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('existing_uuid', None, 'Existing quantum network uuid')
 
-class NetstackManager(manager.FlatManager):
+class QuantumManager(manager.FlatManager):
     def create_networks(self, context, label, cidr, multi_host, num_networks,
                         network_size, cidr_v6, gateway_v6, bridge,
                         bridge_interface, dns1=None, dns2=None, **kwargs):
