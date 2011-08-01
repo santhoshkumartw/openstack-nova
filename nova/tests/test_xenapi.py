@@ -381,21 +381,37 @@ class XenAPIVMTestCase(test.TestCase):
         self.assertEquals(self.vm['HVM_boot_params'], {})
         self.assertEquals(self.vm['HVM_boot_policy'], '')
 
+    def _list_vdis(self):
+        url = FLAGS.xenapi_connection_url
+        username = FLAGS.xenapi_connection_username
+        password = FLAGS.xenapi_connection_password
+        session = xenapi_conn.XenAPISession(url, username, password)
+        return session.call_xenapi('VDI.get_all')
+
+    def _check_vdis(self, start_list, end_list):
+        for vdi_ref in end_list:
+            if not vdi_ref in start_list:
+                self.fail('Found unexpected VDI:%s' % vdi_ref)
+
     def _test_spawn(self, image_ref, kernel_id, ramdisk_id,
                     instance_type_id="3", os_type="linux",
                     architecture="x86-64", instance_id=1,
-                    check_injection=False):
+                    check_injection=False,
+                    create_record=True):
         stubs.stubout_loopingcall_start(self.stubs)
-        values = {'id': instance_id,
-                  'project_id': self.project.id,
-                  'user_id': self.user.id,
-                  'image_ref': image_ref,
-                  'kernel_id': kernel_id,
-                  'ramdisk_id': ramdisk_id,
-                  'instance_type_id': instance_type_id,
-                  'os_type': os_type,
-                  'architecture': architecture}
-        instance = db.instance_create(self.context, values)
+        if create_record:
+            values = {'id': instance_id,
+                      'project_id': self.project.id,
+                      'user_id': self.user.id,
+                      'image_ref': image_ref,
+                      'kernel_id': kernel_id,
+                      'ramdisk_id': ramdisk_id,
+                      'instance_type_id': instance_type_id,
+                      'os_type': os_type,
+                      'architecture': architecture}
+            instance = db.instance_create(self.context, values)
+        else:
+            instance = db.instance_get(self.context, instance_id)
         network_info = [({'bridge': 'fa0', 'id': 0, 'injected': True},
                           {'broadcast': '192.168.0.255',
                            'dns': ['192.168.0.1'],
@@ -421,6 +437,36 @@ class XenAPIVMTestCase(test.TestCase):
         self.assertRaises(Exception,
                           self._test_spawn,
                           1, 2, 3, "4")  # m1.xlarge
+
+    def test_spawn_fail_cleanup_1(self):
+        """Simulates an error while downloading an image.
+
+        Verifies that VDIs created are properly cleaned up.
+
+        """
+        vdi_recs_start = self._list_vdis()
+        FLAGS.xenapi_image_service = 'glance'
+        stubs.stubout_fetch_image_glance_disk(self.stubs)
+        self.assertRaises(xenapi_fake.Failure,
+                          self._test_spawn, 1, 2, 3)
+        # No additional VDI should be found.
+        vdi_recs_end = self._list_vdis()
+        self._check_vdis(vdi_recs_start, vdi_recs_end)
+
+    def test_spawn_fail_cleanup_2(self):
+        """Simulates an error while creating VM record.
+
+        It verifies that VDIs created are properly cleaned up.
+
+        """
+        vdi_recs_start = self._list_vdis()
+        FLAGS.xenapi_image_service = 'glance'
+        stubs.stubout_create_vm(self.stubs)
+        self.assertRaises(xenapi_fake.Failure,
+                          self._test_spawn, 1, 2, 3)
+        # No additional VDI should be found.
+        vdi_recs_end = self._list_vdis()
+        self._check_vdis(vdi_recs_start, vdi_recs_end)
 
     def test_spawn_raw_objectstore(self):
         FLAGS.xenapi_image_service = 'objectstore'
@@ -557,41 +603,38 @@ class XenAPIVMTestCase(test.TestCase):
         # guest agent is detected
         self.assertFalse(self._tee_executed)
 
-    @test.skip_test("Never gets an address, not sure why")
     def test_spawn_vlanmanager(self):
         self.flags(xenapi_image_service='glance',
                    network_manager='nova.network.manager.VlanManager',
-                   network_driver='nova.network.xenapi_net',
                    vlan_interface='fake0')
 
         def dummy(*args, **kwargs):
             pass
 
-        self.stubs.Set(VMOps, 'create_vifs', dummy)
+        self.stubs.Set(vmops.VMOps, 'create_vifs', dummy)
         # Reset network table
         xenapi_fake.reset_table('network')
         # Instance id = 2 will use vlan network (see db/fakes.py)
         ctxt = self.context.elevated()
-        instance_ref = self._create_instance(2)
-        network_bk = self.network
-        # Ensure we use xenapi_net driver
-        self.network = utils.import_object(FLAGS.network_manager)
+        instance = self._create_instance(2, False)
         networks = self.network.db.network_get_all(ctxt)
         for network in networks:
-            self.network.set_network_host(ctxt, network['id'])
+            self.network.set_network_host(ctxt, network)
 
-        self.network.allocate_for_instance(ctxt, instance_id=instance_ref.id,
-                instance_type_id=1, project_id=self.project.id)
-        self.network.setup_compute_network(ctxt, instance_ref.id)
+        self.network.allocate_for_instance(ctxt,
+                                           instance_id=2,
+                                           host=FLAGS.host,
+                                           vpn=None,
+                                           instance_type_id=1,
+                                           project_id=self.project.id)
         self._test_spawn(glance_stubs.FakeGlance.IMAGE_MACHINE,
                          glance_stubs.FakeGlance.IMAGE_KERNEL,
                          glance_stubs.FakeGlance.IMAGE_RAMDISK,
-                         instance_id=instance_ref.id,
+                         instance_id=2,
                          create_record=False)
         # TODO(salvatore-orlando): a complete test here would require
         # a check for making sure the bridge for the VM's VIF is
         # consistent with bridge specified in nova db
-        self.network = network_bk
 
     def test_spawn_with_network_qos(self):
         self._create_instance()
@@ -602,10 +645,10 @@ class XenAPIVMTestCase(test.TestCase):
                               str(3 * 1024))
 
     def test_rescue(self):
-        self.flags(xenapi_inject_image=False)
+        self.flags(flat_injected=False)
         instance = self._create_instance()
         conn = xenapi_conn.get_connection(False)
-        conn.rescue(instance, None)
+        conn.rescue(instance, None, [])
 
     def test_unrescue(self):
         instance = self._create_instance()
@@ -621,7 +664,7 @@ class XenAPIVMTestCase(test.TestCase):
         self.vm = None
         self.stubs.UnsetAll()
 
-    def _create_instance(self, instance_id=1):
+    def _create_instance(self, instance_id=1, spawn=True):
         """Creates and spawns a test instance."""
         stubs.stubout_loopingcall_start(self.stubs)
         values = {
@@ -649,7 +692,8 @@ class XenAPIVMTestCase(test.TestCase):
                            'label': 'fake',
                            'mac': 'DE:AD:BE:EF:00:00',
                            'rxtx_cap': 3})]
-        self.conn.spawn(instance, network_info)
+        if spawn:
+            self.conn.spawn(instance, network_info)
         return instance
 
 
