@@ -144,9 +144,13 @@ class QuantumManager(manager.FlatManager):
 
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
-      **kwargs):
-        for network in networks:
-            self.allocate_fixed_ip(context, instance_id, network)
+                            **kwargs):
+        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
+
+        return {vif['id']: melange.allocate_ip(vif['network_id'],
+                                               vif['id']) for vif in vifs}
+        # for network in networks:
+        #     self.allocate_fixed_ip(context, instance_id, network)
 
     def _get_networks_for_instance(self, context, instance_id, project_id):
         """Determine & return which networks an instance should connect to."""
@@ -214,3 +218,55 @@ class QuantumManager(manager.FlatManager):
           vpn=vpn)
         return self.get_instance_nw_info(context, instance_id, type_id, host)
 
+    def get_instance_nw_info(self, context, instance_id, instance_type_id, host,
+                             ips=None, **kwargs):
+        """Creates network info list for instance.
+
+        called by allocate_for_instance and netowrk_api
+        context needs to be elevated
+        :returns: network info list [(network,info),(network,info)...]
+        where network = dict containing pertinent data from a network db object
+        and info = dict containing pertinent networking data
+        """
+        # TODO(tr3buchet) should handle floating IPs as well?
+        fixed_ips = self.db.fixed_ip_get_by_instance(context, instance_id)
+        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
+        flavor = self.db.instance_type_get_by_id(context,
+                                                 instance_type_id)
+        network_info = []
+        # a vif has an address, instance_id, and network_id
+        # it is also joined to the instance and network given by those IDs
+        for vif in vifs:
+            ips_for_vif = ips[vif["id"]]
+            v4_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"].version == 4]
+            v6_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"].version == 6]
+            network = vif['network']
+            
+            # TODO(tr3buchet) eventually "enabled" should be determined
+            def ip_dict(ip):
+                return {
+                    "ip": ip["address"],
+                    "netmask": ip["netmask"],
+                    "enabled": "1"}
+
+            network_dict = {
+                'bridge': network['bridge'],
+                'id': network['id'],
+                'cidr': network['cidr'],
+                'cidr_v6': network['cidr_v6'],
+                'injected': network['injected']}
+            info = {
+                'label': network['label'],
+                'gateway': v4_ips[0]['gateway'],
+                'broadcast': network['broadcast'],
+                'mac': vif['address'],
+                'rxtx_cap': flavor['rxtx_cap'],
+                'dns': [network['dns']],
+                'ips': [ip_dict(ip) for ip in v4_ips)]
+            if network['cidr_v6']:
+                info['ip6s'] = [ip_dict(ip) for ip in v6_ips)]
+            # TODO(tr3buchet): handle ip6 routes here as well
+            if network['gateway_v6']:
+                info['gateway6'] = v6_ips[0]['gateway_v6']
+            network_info.append((network_dict, info))
+        return network_info

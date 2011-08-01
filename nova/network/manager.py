@@ -399,9 +399,9 @@ class NetworkManager(manager.SchedulerDependentManager):
                                                                   project_id)
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
-        self._allocate_fixed_ips(admin_context, instance_id, host, networks,
-                                 vpn=vpn)
-        return self.get_instance_nw_info(context, instance_id, type_id, host)
+        ips = self._allocate_fixed_ips(admin_context, instance_id, host, networks,
+                                       vpn=vpn)
+        return self.get_instance_nw_info(context, instance_id, type_id, host, ips=ips)
 
     def deallocate_for_instance(self, context, **kwargs):
         """Handles deallocating various network resources for an instance.
@@ -422,7 +422,7 @@ class NetworkManager(manager.SchedulerDependentManager):
         self.db.virtual_interface_delete_by_instance(context, instance_id)
 
     def get_instance_nw_info(self, context, instance_id,
-                             instance_type_id, host):
+                             instance_type_id, host, **kwargs):
         """Creates network info list for instance.
 
         called by allocate_for_instance and netowrk_api
