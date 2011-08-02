@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2011 Nicira Network, Inc
+# Copyright 2011 Nicira Networks, Inc
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -33,7 +33,9 @@ from nova.network import quantum
 from nova.network import manager
 import random
 
-LOG = logging.getLogger("nsmanager")
+# FIXME: clean-up imports
+
+LOG = logging.getLogger("quantum_manager")
 
 FLAGS = flags.FLAGS
 
@@ -50,6 +52,10 @@ class QuantumManager(manager.FlatManager):
         # FlatManager.create_networks, then once that is complete,
         # calling Quantum and patching up the "bridge" field in the newly
         # created network row.
+
+        if "priority" not in kwargs:
+            raise Exception("QuantumManager requires each network to"
+                                            " have a priority")
 
         fixed_net = netaddr.IPNetwork(cidr)
         if FLAGS.use_ipv6:
@@ -73,7 +79,7 @@ class QuantumManager(manager.FlatManager):
             net['gateway'] = str(project_net[1])
             net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
-            net['priority'] = int(kwargs.get("priority", 0))
+            net['priority'] = int(kwargs["priority"])
             if kwargs["project_id"] not in [None, "0"]:
                 net['project_id'] = kwargs["project_id"]
             if num_networks > 1:
