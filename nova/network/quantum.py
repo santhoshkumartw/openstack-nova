@@ -40,10 +40,12 @@ flags.DEFINE_string('quantum_default_tenant_id',
                     "default",
                     'Default tenant id when creating quantum networks')
 
+
 def get_connection():
     host = FLAGS.quantum_connection_host
     port = FLAGS.quantum_connection_port
     return MiniClient(host, port, False)
+
 
 def create_network(tenant_id, network_name):
     LOG.debug("Creating network on tenant: %s" % tenant_id)
@@ -59,10 +61,12 @@ def create_network(tenant_id, network_name):
     LOG.debug(resdict)
     return resdict["networks"]["network"]["id"]
 
+
 def get_network(tenant_id, uuid):
     res = get_connection().do_request(tenant_id, 'GET',
       "/networks/%s.%s" % (uuid, FORMAT))
     return res.status == 200
+
 
 def get_network_by_name(tenant_id, network_name):
     res = get_connection().do_request(tenant_id, 'GET', "/networks." + FORMAT)
@@ -82,6 +86,7 @@ def get_network_by_name(tenant_id, network_name):
             return net_id
     return None
 
+
 def create_port(tenant_id, network_id):
     data = {'port': {'port-state': 'ACTIVE'}}
     body = json.dumps(data)
@@ -94,6 +99,7 @@ def create_port(tenant_id, network_id):
     LOG.info("Created port on network \"%s\" with id: %s" % (network_id,
         resdict["ports"]["port"]["id"]))
     return resdict["ports"]["port"]["id"]
+
 
 def plug_iface(tenant_id, network_id, port_id, interface_id):
     tid = tenant_id
@@ -110,8 +116,10 @@ def plug_iface(tenant_id, network_id, port_id, interface_id):
         LOG.error("Failed to plug iface \"%s\" to port \"%s\": %s" % (vid,
           pid, output))
         return False
-    LOG.info("Plugged interface \"%s\" to port:%s on network:%s" % (vid, pid, nid))
+    LOG.info("Plugged interface \"%s\" to port:%s on network:%s" % (vid,
+                                                                pid, nid))
     return True
+
 
 def delete_port(tenant_id, network_id, port_id):
     res = get_connection().do_request(tenant_id, 'DELETE',
@@ -119,6 +127,7 @@ def delete_port(tenant_id, network_id, port_id):
     if res.status != 200:
         return False
     return True
+
 
 def get_port_by_attachment(tenant_id, network_id, attachment):
     res = get_connection().do_request(tenant_id, 'GET',
@@ -133,7 +142,8 @@ def get_port_by_attachment(tenant_id, network_id, attachment):
         port_id = p["id"]
         # Get port details (in order to get the attachment)
         res = get_connection().do_request(tenant_id, 'GET',
-          "/networks/%s/ports/%s/attachment.%s" % (network_id, port_id, FORMAT))
+          "/networks/%s/ports/%s/attachment.%s" % (network_id, port_id,
+                                                               FORMAT))
         output = res.read()
         resdict = json.loads(output)
         LOG.debug(resdict)
@@ -141,6 +151,7 @@ def get_port_by_attachment(tenant_id, network_id, attachment):
         if port_attachment == attachment:
             return p["id"]
     return None
+
 
 def unplug_iface(tenant_id, network_id, port_id):
     tid = tenant_id
@@ -151,9 +162,11 @@ def unplug_iface(tenant_id, network_id, port_id):
     output = res.read()
     LOG.debug(output)
     if res.status != 202:
-        LOG.error("Failed to unplug iface from port \"%s\": %s" % (pid, output))
+        LOG.error("Failed to unplug iface from port \"%s\": %s" % \
+                                                    (pid, output))
         return False
     return True
+
 
 class MiniClient(object):
     """A base client class - derived from Glance.BaseClient"""
@@ -196,7 +209,7 @@ class MiniClient(object):
 
         """
         action = MiniClient.action_prefix + action
-        action = action.replace('{tenant_id}',tenant)
+        action = action.replace('{tenant_id}', tenant)
         if type(params) is dict:
             action += '?' + urllib.urlencode(params)
 

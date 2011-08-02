@@ -37,6 +37,7 @@ LOG = logging.getLogger("nsmanager")
 
 FLAGS = flags.FLAGS
 
+
 class QuantumManager(manager.FlatManager):
     def create_networks(self, context, label, cidr, multi_host, num_networks,
                         network_size, cidr_v6, gateway_v6, bridge,
@@ -126,10 +127,11 @@ class QuantumManager(manager.FlatManager):
             else:
                 # If the uuid wasn't provided and the project is specified
                 # then we should try to create this network via quantum.
-                tenant_id = kwargs["project_id"] or FLAGS.quantum_default_tenant_id
+                tenant_id = kwargs["project_id"] or \
+                            FLAGS.quantum_default_tenant_id
                 quantum_net_id = quantum.create_network(tenant_id, label)
                 net["bridge"] = quantum_net_id
-                LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
+                LOG.info(_("Quantum network uuid for network \"%s\": %s" % (
                       label, quantum_net_id)))
 
             # None if network with cidr or cidr_v6 already exists
@@ -140,7 +142,6 @@ class QuantumManager(manager.FlatManager):
             else:
                 raise ValueError(_('Network with cidr %s already exists') %
                                    cidr)
-
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
       **kwargs):
@@ -155,7 +156,7 @@ class QuantumManager(manager.FlatManager):
         networks = self.db.project_get_networks(context, project_id, False)
         networks.extend(self.db.project_get_networks(context, None, False))
 
-        networks = filter((lambda x: x.get("priority",0) != 0), networks)
+        networks = filter((lambda x: x.get("priority", 0) != 0), networks)
         return sorted(networks, key=lambda x: x["priority"])
 
     def allocate_for_instance(self, context, **kwargs):

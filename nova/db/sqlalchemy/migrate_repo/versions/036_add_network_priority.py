@@ -26,6 +26,7 @@ meta = MetaData()
 # Add priority column to networks table
 priority = Column('priority', Integer())
 
+
 def upgrade(migrate_engine):
     meta.bind = migrate_engine
 
@@ -37,6 +38,7 @@ def upgrade(migrate_engine):
     except Exception:
         logging.error(_("priority column not added to networks table"))
         raise
+
 
 # TODO(bgh): figure out how to downgrade
 def downgrade(migrate_engine):
