@@ -1,7 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2010 United States Government as represented by the
-# Administrator of the National Aeronautics and Space Administration.
+# Copyright 2011 Nicira Network, Inc
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -38,13 +37,19 @@ LOG = logging.getLogger("nsmanager")
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('existing_uuid', None, 'Existing quantum network uuid')
-
 class QuantumManager(manager.FlatManager):
     def create_networks(self, context, label, cidr, multi_host, num_networks,
                         network_size, cidr_v6, gateway_v6, bridge,
                         bridge_interface, dns1=None, dns2=None, **kwargs):
         """Create networks based on parameters."""
+
+        # FIXME: enforce that this is called only for a single network
+
+        # FIXME: decomp out most of this function, likely by calling
+        # FlatManager.create_networks, then once that is complete,
+        # calling Quantum and patching up the "bridge" field in the newly
+        # created network row.
+
         fixed_net = netaddr.IPNetwork(cidr)
         if FLAGS.use_ipv6:
             fixed_net_v6 = netaddr.IPNetwork(cidr_v6)
@@ -108,30 +113,24 @@ class QuantumManager(manager.FlatManager):
             # Populate the quantum network uuid if we have it.  We're
             # currently using the bridge column for this since we don't have
             # another place to put it.
-            if FLAGS.existing_uuid is not None:
+            existing_id = kwargs.get("existing_net_id", None)
+            if existing_id:
                 try:
                     network_exists = quantum.get_network(
-                      FLAGS.quantum_default_tenant_id, FLAGS.existing_uuid)
+                      FLAGS.quantum_default_tenant_id, existing_id)
                 except:
                     txt = "Unable to find quantum network with uuid: %s" % \
-                      (FLAGS.existing_uuid)
+                      (existing_id)
                     raise Exception(txt)
-                net["bridge"] = FLAGS.existing_uuid
+                net["bridge"] = existing_id
             else:
                 # If the uuid wasn't provided and the project is specified
                 # then we should try to create this network via quantum.
-                if kwargs.get("project_id", None) not in [None, "0"]:
-                    project_id = kwargs["project_id"]
-                    # We need to create the private network if it doesnt exist.
-                    private_net_name = "%s_private" % (project_id)
-                    net_uuid = quantum.get_network_by_name(project_id,
-                      private_net_name)
-                    if not net_uuid:
-                        net_uuid = quantum.create_network(project_id,
-                          private_net_name)
-                    net["bridge"] = net_uuid
-                    LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
-                      private_net_name, net_uuid)))
+                tenant_id = kwargs["project_id"] or FLAGS.quantum_default_tenant_id
+                quantum_net_id = quantum.create_network(tenant_id, label)
+                net["bridge"] = quantum_net_id
+                LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
+                      label, quantum_net_id)))
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
@@ -150,48 +149,14 @@ class QuantumManager(manager.FlatManager):
 
     def _get_networks_for_instance(self, context, instance_id, project_id):
         """Determine & return which networks an instance should connect to."""
-        networks = self.db.network_get_all(context)
 
-        # We want to construct something like:
-        #   networks = [private_network, other nets ordered by priority]
-        # The private network will be the one matching the project id.  The
-        # others will be networks with no project_id but with a priority key
-        # that we'll use to order them.  To remove a network as a potential
-        # candidate just make its priority NULL (or 0).
+        # get all networks with this project_id, as well as all networks
+        # where the project-id is not set (these are shared networks)
+        networks = self.db.project_get_networks(context, project_id, False)
+        networks.extend(self.db.project_get_networks(context, None, False))
 
-        LOG.debug(("Current project id: %s" % project_id))
-
-        # Filter out any vlan networks
-        networks = [network for network in networks if not network['vlan']]
-
-        for n in networks:
-            LOG.debug("%s (project: %s)" % (n["label"], n["project_id"]))
-        try:
-            private_network = [network for network in networks if
-              network['project_id'] == project_id][0]
-        except:
-            raise Exception("Unable to find private network for project: %s" % (project_id))
-
-        LOG.debug(_("Found private network: %s" % private_network))
-
-        result = [private_network]
-        # Filter out any networks without a priority
-        networks_with_pri = []
-        for x in networks:
-            pri = 0
-            try:
-                pri = int(x["priority"])
-            except:
-                continue
-            if pri == 0:
-                continue
-            networks_with_pri.append(x)
-            LOG.debug(_("Found network with priority %d: %s" % (pri,
-              x["label"])))
-        networks_with_pri.sort(key=lambda x: x["priority"])
-        for x in networks_with_pri:
-            result.append(x)
-        return result
+        networks = filter((lambda x: x.get("priority",0) != 0), networks)
+        return sorted(networks, key=lambda x: x["priority"])
 
     def allocate_for_instance(self, context, **kwargs):
         """Handles allocating the various network resources for an instance.
@@ -208,9 +173,50 @@ class QuantumManager(manager.FlatManager):
                                                             context=context)
         networks = self._get_networks_for_instance(admin_context, instance_id,
                                                                   project_id)
+
+        # Create a port via quantum and attach the vif
+        tenant_id = project_id
+        for n in networks:
+            vif_id = "nova-" + str(instance_id) + "-" + str(n['id'])
+            quantum_net_id = n['bridge']
+            LOG.debug("Using quantum_net_id: %s" % quantum_net_id)
+            port_id = quantum.create_port(tenant_id, quantum_net_id)
+            quantum.plug_iface(tenant_id, quantum_net_id, port_id, vif_id)
+
+            # TODO: also communicate "interface-binding" and "tenant-id"
+            # to Quantum
+
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
         self._allocate_fixed_ips(admin_context, instance_id, host, networks,
           vpn=vpn)
         return self.get_instance_nw_info(context, instance_id, type_id, host)
 
+    def deallocate_for_instance(self, context, **kwargs):
+        instance_id = kwargs.get('instance_id')
+        project_id = kwargs.pop('project_id', None)
+        admin_context = context.elevated()
+        networks = self._get_networks_for_instance(admin_context, instance_id,
+                                                                  project_id)
+        for n in networks:
+            vif_id = "nova-" + str(instance_id) + "-" + str(n['id'])
+            # Un-attach the vif and delete the port
+            tenant_id = project_id or FLAGS.quantum_default_tenant_id
+            quantum_net_id = n['bridge']
+            LOG.debug("Using quantum_net_id: %s" % quantum_net_id)
+            attachment = vif_id
+            port_id = quantum.get_port_by_attachment(tenant_id,
+                                            quantum_net_id, attachment)
+
+            # FIXME: tell Quantum that this interface-binding is no
+            # longer valid.
+
+            if not port_id:
+                LOG.error("Unable to find port with attachment: %s" % \
+                                                        (attachment))
+            else:
+                quantum.unplug_iface(tenant_id, quantum_net_id, port_id)
+                quantum.delete_port(tenant_id, quantum_net_id, port_id)
+
+        return manager.FlatManager.deallocate_for_instance(self,
+                                                        context, **kwargs)

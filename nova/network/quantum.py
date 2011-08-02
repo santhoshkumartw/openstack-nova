@@ -37,20 +37,8 @@ flags.DEFINE_string('quantum_connection_port',
                     'PORT for connecting to quantum')
 
 flags.DEFINE_string('quantum_default_tenant_id',
-                    None,
-                    'Default tenant id for use with networks')
-
-flags.DEFINE_string('nvp_public_network_id',
-                    None,
-                    'Network id (lswitch uuid) for public net')
-
-flags.DEFINE_string('nvp_service_network_id',
-                    None,
-                    'Network id (lswitch uuid) for service net')
-
-flags.DEFINE_string('nvp_private_network_id',
-                    None,
-                    'Network id (lswitch uuid) for private net')
+                    "default",
+                    'Default tenant id when creating quantum networks')
 
 def get_connection():
     host = FLAGS.quantum_connection_host
@@ -61,7 +49,7 @@ def create_network(tenant_id, network_name):
     LOG.debug("Creating network on tenant: %s" % tenant_id)
     if tenant_id == None:
         tenant_id = FLAGS.quantum_default_tenant_id
-    data = {'network': {'network-name': network_name}}
+    data = {'network': {'net-name': network_name}}
     body = json.dumps(data)
     res = get_connection().do_request(tenant_id, 'POST', "/networks." + FORMAT,
       body=body)
@@ -145,11 +133,11 @@ def get_port_by_attachment(tenant_id, network_id, attachment):
         port_id = p["id"]
         # Get port details (in order to get the attachment)
         res = get_connection().do_request(tenant_id, 'GET',
-          "/networks/%s/ports/%s.%s" % (network_id, port_id, FORMAT))
+          "/networks/%s/ports/%s/attachment.%s" % (network_id, port_id, FORMAT))
         output = res.read()
         resdict = json.loads(output)
         LOG.debug(resdict)
-        port_attachment = resdict["ports"]["port"]["attachment"]
+        port_attachment = resdict["attachment"]
         if port_attachment == attachment:
             return p["id"]
     return None

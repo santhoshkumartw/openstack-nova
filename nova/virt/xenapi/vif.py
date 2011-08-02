@@ -137,29 +137,7 @@ class XenAPIOpenVswitchDriver(VIFDriver):
         # set the iface-id attribute
         vif_rec['other_config'] = {"nicira-iface-id": vif_id}
 
-        # Create a port via quantum and attach the vif
-        tenant_id = instance.get('project_id', FLAGS.quantum_default_tenant_id)
-        network_id = network['bridge']
-        LOG.debug("Using network_id: %s" % network_id)
-        port_id = quantum.create_port(tenant_id, network_id)
-        quantum.plug_iface(tenant_id, network_id, port_id, vif_id)
-
         return vif_rec
 
     def unplug(self, instance, network, mapping):
-        vif_id = "nova-" + str(instance['id']) + "-" + str(network['id'])
-        # Un-attach the vif and delete the port
-        tenant_id = instance.get('project_id',
-          FLAGS.quantum_default_tenant_id)
-        tenant_network_id = quantum.get_network_by_name(tenant_id,
-          "%s_private" % tenant_id)
-        network_id = network['bridge']
-        LOG.debug("Using network_id: %s" % network_id)
-        attachment = vif_id
-        port_id = quantum.get_port_by_attachment(tenant_id,
-          network_id, attachment)
-        if not port_id:
-            LOG.error("Unable to find port with attachment: %s" % (attachment))
-        else:
-            quantum.unplug_iface(tenant_id, network_id, port_id)
-            quantum.delete_port(tenant_id, network_id, port_id)
+        pass
