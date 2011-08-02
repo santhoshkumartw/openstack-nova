@@ -21,6 +21,7 @@ import urllib
 import json
 from nova import flags
 
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('melange_host',
@@ -33,28 +34,24 @@ flags.DEFINE_string('melange_port',
 
 
 def allocate_ip(network_id, vif_id, project_id=None):
-    if project_id:
-        url = ("/v0.1/ipam/networks/tenants/%(project_id)s/%(network_id)s/ports/%(vif_id)s/ip_allocations" %
-               locals())
-    else:
-        url = ("/v0.1/ipam/networks/%(network_id)s/ports/%(vif_id)s/ip_allocations" %
+    tenant_scope = "/tenants/%s" % project_id if project_id else ""
+
+    url = ("/v0.1/ipam/networks/%(network_id)s%(tenant_scope)s/ports/%(vif_id)s/ip_allocations" %
                locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
-    response = client.post(url, headers={'Content-type':"application/json"}) 
+    response = client.post(url, headers={'Content-type':"application/json"})
     return json.loads(response.read())['ip_addresses']
 
-def create_block(network_id, cidr, project_id=None):
-    type = 'private'
 
-    if project_id:
-        url = ("/v0.1/ipam/tenants/%(project_id)s/ip_blocks" % locals())
-    else:
-        url = ("/v0.1/ipam/%(network_id)s/ip_blocks" % locals())
+def create_block(network_id, cidr, project_id=None):
+    tenant_scope = "/tenants/%s" % project_id if project_id else ""
+
+    url = "/v0.1/ipam%(tenant_scope)s/ip_blocks" % locals()
     
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
-    client.post(url, body=json.dumps(dict(ip_block=dict(cidr=cidr, network_id=network_id, type='private')))
-                , headers={'Content-type':"application/json"})
+    client.post(url, body=json.dumps(dict(ip_block=dict(cidr=cidr, network_id=network_id, type='private'))),
+                headers={'Content-type':"application/json"})
 
 
 

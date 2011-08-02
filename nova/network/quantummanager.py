@@ -31,7 +31,7 @@ from nova import utils
 from nova import rpc
 from nova.network import api as network_api
 from nova.network import quantum
-from nova.network import melange
+from nova.network import melange_client as melange
 from nova.network import manager
 import random
 

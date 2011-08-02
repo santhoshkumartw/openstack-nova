@@ -1,0 +1,104 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2011 Rackspace
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+from nova import network
+from nova import db
+from nova import exception
+from nova import flags
+from nova import log as logging
+from nova import test
+from nova.network import manager as network_manager
+from nova.network import melange_client
+
+import json
+import mox
+
+
+FLAGS = flags.FLAGS
+LOG = logging.getLogger('nova.tests.network')
+
+
+class TestCreateBlock(test.TestCase):
+
+    def test_create_block_for_a_given_project_id(self):
+        network_id = "netwok123"
+        cidr = "10.0.0.0/24"
+        project_id = "project1"
+        mock_client = setup_mock_client(self.mox)
+        mock_client.post("/v0.1/ipam/tenants/project1/ip_blocks",
+                         body=json.dumps(dict(ip_block=dict(cidr=cidr, network_id=network_id, type='private'))),
+                         headers={'Content-type':"application/json"}).AndReturn(None)
+
+        self.mox.ReplayAll()
+
+        melange_client.create_block(network_id, cidr, project_id=project_id)
+
+    def test_create_block_wihtout_project_id(self):
+        network_id = "network123"
+        cidr = "10.0.0.0/24"
+        mock_client = setup_mock_client(self.mox)
+        mock_client.post("/v0.1/ipam/ip_blocks",
+                         body=json.dumps(dict(ip_block=dict(cidr=cidr, network_id=network_id, type='private'))),
+                         headers={'Content-type':"application/json"}).AndReturn(None)
+
+        self.mox.ReplayAll()
+
+        melange_client.create_block(network_id, cidr, project_id=None)
+
+
+class TestAllocateIp(test.TestCase):
+
+    def test_allocate_ip_for_a_given_project_id(self):
+        network_id = "network1"
+        vif_id = "vif1"
+        project_id = "project2"
+        mock_client = setup_mock_client(self.mox)
+        mock_client.post("/v0.1/ipam/networks/network1/tenants/project2/ports/vif1/ip_allocations",
+                         headers={'Content-type':"application/json"}).AndReturn(ResponseStub({'ip_addresses': [{'id': "123"}]}))
+
+        self.mox.ReplayAll()
+
+        ip_addresses = melange_client.allocate_ip(network_id, vif_id, project_id=project_id)
+        self.assertEqual(ip_addresses, [{'id': "123"}])
+
+    def test_allocate_ip_without_a_project_id(self):
+        network_id = "network333"
+        vif_id = "vif1"
+        mock_client = setup_mock_client(self.mox)
+        mock_client.post("/v0.1/ipam/networks/network333/ports/vif1/ip_allocations",
+                         headers={'Content-type':"application/json"}).AndReturn(ResponseStub({'ip_addresses': [{'id': "123"}]}))
+
+        self.mox.ReplayAll()
+
+        ip_addresses = melange_client.allocate_ip(network_id, vif_id, project_id=None)
+        self.assertEqual(ip_addresses, [{'id': "123"}])
+
+
+def setup_mock_client(mox):
+    mock_client = mox.CreateMockAnything()
+    mox.StubOutWithMock(melange_client, 'Client')
+    melange_client.Client(FLAGS.melange_host, FLAGS.melange_port).AndReturn(mock_client)
+    return mock_client
+
+
+class ResponseStub():
+
+    def __init__(self, response_data):
+        self.response_data = response_data
+
+    def read(self):
+        return json.dumps(self.response_data)
