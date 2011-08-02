@@ -746,23 +746,27 @@ class NetworkCommands(object):
 
     def list(self):
         """List all created networks"""
-        print "%-18s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s" % (
+        print "%-18s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s" % (
                                                   _('network'),
                                                   _('netmask'),
                                                   _('start address'),
                                                   _('DNS1'),
                                                   _('DNS2'),
                                                   _('VlanID'),
-                                                  'project')
+                                                  'project',
+                                                  'priority',
+                                                  'bridge')
         for network in db.network_get_all(context.get_admin_context()):
-            print "%-18s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s" % (
+            print "%-18s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s\t%-15s" % (
                                         network.cidr,
                                         network.netmask,
                                         network.dhcp_start,
                                         network.dns1,
                                         network.dns2,
                                         network.vlan,
-                                        network.project_id)
+                                        network.project_id,
+                                        network.priority,
+                                        network.bridge)
 
     @args('--network', dest="fixed_range", metavar='<x.x.x.x/yy>',
             help='Network to delete')
