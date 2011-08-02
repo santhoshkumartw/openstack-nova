@@ -61,7 +61,7 @@ def create_network(tenant_id, network_name):
     LOG.debug("Creating network on tenant: %s" % tenant_id)
     if tenant_id == None:
         tenant_id = FLAGS.quantum_default_tenant_id
-    data = {'network': {'network-name': network_name}}
+    data = {'network': {'net-name': network_name}}
     body = json.dumps(data)
     res = get_connection().do_request(tenant_id, 'POST', "/networks." + FORMAT,
       body=body)
@@ -88,7 +88,7 @@ def get_network_by_name(tenant_id, network_name):
           "/networks/%s.%s" % (net_id, FORMAT))
         rd = json.loads(res.read())
         LOG.debug(rd)
-        name = rd["networks"]["network"]["name"]
+        name = rd["network"]["name"]
         LOG.debug("Network ID:%s, name: %s" % (net_id, name))
         if name == network_name:
             return net_id

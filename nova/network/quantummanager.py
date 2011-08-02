@@ -31,6 +31,7 @@ from nova import utils
 from nova import rpc
 from nova.network import api as network_api
 from nova.network import quantum
+from nova.network import melange
 from nova.network import manager
 import random
 
@@ -135,20 +136,25 @@ class QuantumManager(manager.FlatManager):
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
-
+            
+            project_id = kwargs.get("project_id", None)
+            if project_id == '0':
+                project_id = None
             if network:
-                self._create_fixed_ips(context, network['id'])
+                melange.create_block(network['id'], network['cidr'], project_id)
+                if network['cidr_v6']:
+                    melange.create_block(network['id'], network['cidr_v6'], project_id)
             else:
                 raise ValueError(_('Network with cidr %s already exists') %
-                                   cidr)
+                                 cidr)
 
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
                             **kwargs):
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
 
-        return {vif['id']: melange.allocate_ip(vif['network_id'],
-                                               vif['id']) for vif in vifs}
+        return dict((vif['id'], melange.allocate_ip(vif['network_id'],
+                                               vif['id'])) for vif in vifs)
         # for network in networks:
         #     self.allocate_fixed_ip(context, instance_id, network)
 
@@ -214,9 +220,9 @@ class QuantumManager(manager.FlatManager):
                                                                   project_id)
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
-        self._allocate_fixed_ips(admin_context, instance_id, host, networks,
+        ips = self._allocate_fixed_ips(admin_context, instance_id, host, networks,
           vpn=vpn)
-        return self.get_instance_nw_info(context, instance_id, type_id, host)
+        return self.get_instance_nw_info(context, instance_id, type_id, host, ips=ips)
 
     def get_instance_nw_info(self, context, instance_id, instance_type_id, host,
                              ips=None, **kwargs):
@@ -229,17 +235,18 @@ class QuantumManager(manager.FlatManager):
         and info = dict containing pertinent networking data
         """
         # TODO(tr3buchet) should handle floating IPs as well?
-        fixed_ips = self.db.fixed_ip_get_by_instance(context, instance_id)
+        #fixed_ips = self.db.fixed_ip_get_by_instance(context, instance_id)
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
-        flavor = self.db.instance_type_get_by_id(context,
+        flavor = self.db.instance_type_get(context,
                                                  instance_type_id)
         network_info = []
         # a vif has an address, instance_id, and network_id
         # it is also joined to the instance and network given by those IDs
         for vif in vifs:
             ips_for_vif = ips[vif["id"]]
-            v4_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"].version == 4]
-            v6_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"].version == 6]
+            LOG.debug(ips_for_vif)
+            v4_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"]).version == 4]
+            v6_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"]).version == 6]
             network = vif['network']
             
             # TODO(tr3buchet) eventually "enabled" should be determined
@@ -254,19 +261,19 @@ class QuantumManager(manager.FlatManager):
                 'id': network['id'],
                 'cidr': network['cidr'],
                 'cidr_v6': network['cidr_v6'],
-                'injected': network['injected']}
+                'injected': True}
             info = {
                 'label': network['label'],
                 'gateway': v4_ips[0]['gateway'],
                 'broadcast': network['broadcast'],
                 'mac': vif['address'],
                 'rxtx_cap': flavor['rxtx_cap'],
-                'dns': [network['dns']],
-                'ips': [ip_dict(ip) for ip in v4_ips)]
+                'dns': [network['dns1']],
+                'ips': [ip_dict(ip) for ip in v4_ips]}
             if network['cidr_v6']:
-                info['ip6s'] = [ip_dict(ip) for ip in v6_ips)]
+                info['ip6s'] = [ip_dict(ip) for ip in v6_ips]
             # TODO(tr3buchet): handle ip6 routes here as well
-            if network['gateway_v6']:
+            if network['gateway_v6'] and v6_ips:
                 info['gateway6'] = v6_ips[0]['gateway_v6']
             network_info.append((network_dict, info))
         return network_info
