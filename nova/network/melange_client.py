@@ -32,15 +32,17 @@ flags.DEFINE_string('melange_port',
                     '9898',
                     'PORT for connecting to melange')
 
+json_content_type = {'Content-type': "application/json"}
+
 
 def allocate_ip(network_id, vif_id, project_id=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
-    url = ("/v0.1/ipam/networks/%(network_id)s%(tenant_scope)s/ports/%(vif_id)s/ip_allocations" %
-               locals())
+    url = ("/v0.1/ipam/networks/%(network_id)s%(tenant_scope)s/"
+           "ports/%(vif_id)s/ip_allocations" % locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
-    response = client.post(url, headers={'Content-type':"application/json"})
+    response = client.post(url, headers=json_content_type)
     return json.loads(response.read())['ip_addresses']
 
 
@@ -48,11 +50,11 @@ def create_block(network_id, cidr, project_id=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
     url = "/v0.1/ipam%(tenant_scope)s/ip_blocks" % locals()
-    
-    client = Client(FLAGS.melange_host, FLAGS.melange_port)
-    client.post(url, body=json.dumps(dict(ip_block=dict(cidr=cidr, network_id=network_id, type='private'))),
-                headers={'Content-type':"application/json"})
 
+    client = Client(FLAGS.melange_host, FLAGS.melange_port)
+    req_params = dict(ip_block=dict(cidr=cidr, network_id=network_id,
+                                    type='private'))
+    client.post(url, body=json.dumps(req_params), headers=json_content_type)
 
 
 class Client(object):
@@ -91,4 +93,3 @@ class Client(object):
         except (socket.error, IOError), e:
             raise Exception("Unable to connect to "
                             "server. Got error: %s" % e)
-

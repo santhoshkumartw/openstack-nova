@@ -132,8 +132,8 @@ class QuantumManager(manager.FlatManager):
                         net_uuid = quantum.create_network(project_id,
                           private_net_name)
                     net["bridge"] = net_uuid
-                    LOG.info(_("Quantum network uuid for network \"%s\": %s"% (
-                      private_net_name, net_uuid)))
+                    LOG.info(_("Quantum network uuid for network"
+                         " \"%(private_net_name)s\": %(net_uuid)s" % locals()))
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
@@ -154,8 +154,14 @@ class QuantumManager(manager.FlatManager):
                             **kwargs):
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
 
-        return dict((vif['id'], melange.allocate_ip(vif['network_id'],
-                                               vif['id'])) for vif in vifs)
+        def allocate_ip(vif):
+            network_for_vif = lambda net: net['id'] == vif['network_id']
+            project_id = filter(network_for_vif, networks)[0].project_id
+
+            return melange.allocate_ip(vif['network_id'],
+                                       vif['id'], project_id=project_id)
+
+        return dict((vif['id'], allocate_ip(vif))  for vif in vifs)
         # for network in networks:
         #     self.allocate_fixed_ip(context, instance_id, network)
 
@@ -197,8 +203,8 @@ class QuantumManager(manager.FlatManager):
             if pri == 0:
                 continue
             networks_with_pri.append(x)
-            LOG.debug(_("Found network with priority %d: %s" % (pri,
-              x["label"])))
+            LOG.debug(_("Found network with priority %(priority)d: %(label)s"
+                        % dict(priority=pri, label=x["label"])))
         networks_with_pri.sort(key=lambda x: x["priority"])
         for x in networks_with_pri:
             result.append(x)
@@ -222,7 +228,7 @@ class QuantumManager(manager.FlatManager):
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
         ips = self._allocate_fixed_ips(admin_context, instance_id, host, networks,
-          vpn=vpn)
+                                       vpn=vpn)
         return self.get_instance_nw_info(context, instance_id, type_id, host, ips=ips)
 
     def get_instance_nw_info(self, context, instance_id, instance_type_id, host,
