@@ -69,7 +69,7 @@ class TestAllocateIp(test.TestCase):
         project_id = "project2"
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
-        mock_client.post("/v0.1/ipam/networks/network1/tenants/project2/"
+        mock_client.post("/v0.1/ipam/tenants/project2/networks/network1/"
                          "ports/vif1/ip_allocations",
                          headers=json_content_type()).AndReturn(stub_response)
 

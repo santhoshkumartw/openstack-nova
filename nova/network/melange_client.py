@@ -38,7 +38,7 @@ json_content_type = {'Content-type': "application/json"}
 def allocate_ip(network_id, vif_id, project_id=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
-    url = ("/v0.1/ipam/networks/%(network_id)s%(tenant_scope)s/"
+    url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
            "ports/%(vif_id)s/ip_allocations" % locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
