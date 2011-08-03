@@ -41,6 +41,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('existing_uuid', None, 'Existing quantum network uuid')
 
+
 class QuantumManager(manager.FlatManager):
     def create_networks(self, context, label, cidr, multi_host, num_networks,
                         network_size, cidr_v6, gateway_v6, bridge,
@@ -136,7 +137,7 @@ class QuantumManager(manager.FlatManager):
 
             # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
-            
+
             project_id = kwargs.get("project_id", None)
             if project_id == '0':
                 project_id = None
