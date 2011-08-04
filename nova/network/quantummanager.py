@@ -283,10 +283,8 @@ class QuantumManager(manager.FlatManager):
                 'rxtx_cap': flavor['rxtx_cap'],
                 'dns': [network['dns1']],
                 'ips': [ip_dict(ip) for ip in v4_ips]}
-            if network['cidr_v6']:
+            if v6_ips:
                 info['ip6s'] = [ip_dict(ip) for ip in v6_ips]
-            # TODO(tr3buchet): handle ip6 routes here as well
-            if network['gateway_v6'] and v6_ips:
-                info['gateway6'] = v6_ips[0]['gateway_v6']
+                info['gateway6'] = v6_ips[0]['gateway']
             network_info.append((network_dict, info))
         return network_info

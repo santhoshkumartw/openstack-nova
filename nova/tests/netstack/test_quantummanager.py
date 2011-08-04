@@ -175,6 +175,8 @@ class TestAllocateForInstance(test.TestCase):
         self.assertEqual(net_info['ip6s'], [{'ip': 'fe::2',
                                             'netmask': 'f:f:f:f::',
                                             'enabled': '1'}])
+        self.assertEqual(net_info['gateway'], "10.1.1.1")
+        self.assertEqual(net_info['gateway6'], "fe::1")
 
     def _stub_out_mac_address_generation(self, stub_mac_address,
                                          network_manager):
