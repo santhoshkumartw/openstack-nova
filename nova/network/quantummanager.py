@@ -142,13 +142,14 @@ class QuantumManager(manager.FlatManager):
             if project_id == '0':
                 project_id = None
             if network:
-                melange.create_block(network['id'], network['cidr'], project_id)
+                melange.create_block(network['id'], network['cidr'],
+                                     project_id)
                 if network['cidr_v6']:
-                    melange.create_block(network['id'], network['cidr_v6'], project_id)
+                    melange.create_block(network['id'], network['cidr_v6'],
+                                         project_id)
             else:
                 raise ValueError(_('Network with cidr %s already exists') %
                                  cidr)
-
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
                             **kwargs):
@@ -159,7 +160,8 @@ class QuantumManager(manager.FlatManager):
             project_id = filter(network_for_vif, networks)[0].project_id
 
             return melange.allocate_ip(vif['network_id'],
-                                       vif['id'], project_id=project_id)
+                                       vif['id'], project_id=project_id,
+                                       mac_address=vif['address'])
 
         return dict((vif['id'], allocate_ip(vif))  for vif in vifs)
         # for network in networks:
@@ -187,7 +189,8 @@ class QuantumManager(manager.FlatManager):
             private_network = [network for network in networks if
               network['project_id'] == project_id][0]
         except:
-            raise Exception("Unable to find private network for project: %s" % (project_id))
+            raise Exception("Unable to find private network"
+                            " for project: %s" % (project_id))
 
         LOG.debug(_("Found private network: %s" % private_network))
 
@@ -227,12 +230,13 @@ class QuantumManager(manager.FlatManager):
                                                                   project_id)
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
-        ips = self._allocate_fixed_ips(admin_context, instance_id, host, networks,
-                                       vpn=vpn)
-        return self.get_instance_nw_info(context, instance_id, type_id, host, ips=ips)
+        ips = self._allocate_fixed_ips(admin_context, instance_id, host,
+                                       networks, vpn=vpn)
+        return self.get_instance_nw_info(context, instance_id, type_id,
+                                         host, ips=ips)
 
-    def get_instance_nw_info(self, context, instance_id, instance_type_id, host,
-                             ips=None, **kwargs):
+    def get_instance_nw_info(self, context, instance_id, instance_type_id,
+                             host, ips=None, **kwargs):
         """Creates network info list for instance.
 
         called by allocate_for_instance and netowrk_api
@@ -252,10 +256,12 @@ class QuantumManager(manager.FlatManager):
         for vif in vifs:
             ips_for_vif = ips[vif["id"]]
             LOG.debug(ips_for_vif)
-            v4_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"]).version == 4]
-            v6_ips = [ip for ip in ips_for_vif if netaddr.IPAddress(ip["address"]).version == 6]
+            v4_ips = [ip for ip in ips_for_vif
+                      if netaddr.IPAddress(ip["address"]).version == 4]
+            v6_ips = [ip for ip in ips_for_vif
+                      if netaddr.IPAddress(ip["address"]).version == 6]
             network = vif['network']
-            
+
             # TODO(tr3buchet) eventually "enabled" should be determined
             def ip_dict(ip):
                 return {

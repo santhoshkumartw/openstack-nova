@@ -20,6 +20,7 @@ from nova import log as logging
 from nova import test
 from nova import context
 from nova.network.quantummanager import QuantumManager
+from nova.network import manager
 from nova.network import quantum
 from nova.network import melange_client
 from nova.db import api as db_api
@@ -97,6 +98,9 @@ class TestAllocateForInstance(test.TestCase):
 
         private_network = db_api.network_create_safe(admin_context,
                                   dict(label='private', project_id="project1"))
+        private_noise_network = db_api.network_create_safe(admin_context,
+                                  dict(label='private',
+                                       project_id="some_other_project"))
         public_network = db_api.network_create_safe(admin_context,
                                   dict(label='public', priority=1))
 
@@ -107,10 +111,12 @@ class TestAllocateForInstance(test.TestCase):
                            gateway="77.1.1.1")
 
         melange_client.allocate_ip(private_network.id, IgnoreArg(),
-                                   project_id="project1")\
+                                   project_id="project1",
+                                   mac_address=IgnoreArg())\
                                    .InAnyOrder().AndReturn([private_v4ip])
         melange_client.allocate_ip(public_network.id, IgnoreArg(),
-                                   project_id=None)\
+                                   project_id=None,
+                                   mac_address=IgnoreArg())\
                                    .InAnyOrder().AndReturn([public_v4ip])
         self.mox.ReplayAll()
 
@@ -135,6 +141,8 @@ class TestAllocateForInstance(test.TestCase):
 
     def test_allocates_v6_ips_from_melange(self):
         quantum_mgr = QuantumManager()
+        mac_address = "11:22:33:44:55:66"
+        self._stub_out_mac_address_generation(mac_address, quantum_mgr)
         admin_context = context.get_admin_context()
         instance = db_api.instance_create(admin_context, {})
 
@@ -149,7 +157,8 @@ class TestAllocateForInstance(test.TestCase):
                               gateway="fe::1")
 
         melange_client.allocate_ip(network.id, IgnoreArg(),
-                                   project_id="project1")\
+                                   project_id="project1",
+                                   mac_address=mac_address)\
                                    .AndReturn([allocated_v4ip, allocated_v6ip])
         self.mox.ReplayAll()
 
@@ -166,6 +175,11 @@ class TestAllocateForInstance(test.TestCase):
         self.assertEqual(net_info['ip6s'], [{'ip': 'fe::2',
                                             'netmask': 'f:f:f:f::',
                                             'enabled': '1'}])
+
+    def _stub_out_mac_address_generation(self, stub_mac_address,
+                                         network_manager):
+        self.mox.StubOutWithMock(network_manager, 'generate_mac_address')
+        network_manager.generate_mac_address().AndReturn(stub_mac_address)
 
 
 def create_quantum_network(**kwargs):

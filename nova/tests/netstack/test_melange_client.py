@@ -67,16 +67,18 @@ class TestAllocateIp(test.TestCase):
         network_id = "network1"
         vif_id = "vif1"
         project_id = "project2"
+        mac_address = "11:22:33:44:55:66"
+        request_body = json.dumps(dict(network=dict(mac_address=mac_address)))
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/tenants/project2/networks/network1/"
-                         "ports/vif1/ip_allocations",
+                         "ports/vif1/ip_allocations", body=request_body,
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
 
         ip_addresses = melange_client.allocate_ip(network_id, vif_id,
-                                                  project_id=project_id)
+                        project_id=project_id, mac_address=mac_address)
         self.assertEqual(ip_addresses, [{'id': "123"}])
 
     def test_allocate_ip_without_a_project_id(self):
@@ -85,7 +87,7 @@ class TestAllocateIp(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/networks/network333/"
-                         "ports/vif1/ip_allocations",
+                         "ports/vif1/ip_allocations", body=None,
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
