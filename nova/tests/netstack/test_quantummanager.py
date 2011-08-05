@@ -106,9 +106,9 @@ class TestAllocateForInstance(test.TestCase):
 
         self.mox.StubOutWithMock(melange_client, 'allocate_ip')
         private_v4ip = dict(address="10.1.1.2", netmask="255.255.255.0",
-                            gateway="10.1.1.1")
+                            gateway="10.1.1.1", broadcast="10.1.1.255")
         public_v4ip = dict(address="77.1.1.2", netmask="255.255.0.0",
-                           gateway="77.1.1.1")
+                           gateway="77.1.1.1", broadcast="77.1.1.255")
 
         melange_client.allocate_ip(private_network.id, IgnoreArg(),
                                    project_id="project1",
@@ -130,11 +130,16 @@ class TestAllocateForInstance(test.TestCase):
          (public_net, public_net_info)] = net_info
 
         self.assertEqual(private_net_info['label'], 'private')
+        self.assertEqual(private_net_info['gateway'], '10.1.1.1')
+        self.assertEqual(private_net_info['broadcast'], '10.1.1.255')
         self.assertEqual(private_net_info['ips'], [{'ip': '10.1.1.2',
                                             'netmask': '255.255.255.0',
                                             'enabled': '1'}])
 
         self.assertEqual(public_net_info['label'], 'public')
+        self.assertEqual(public_net_info['gateway'], '77.1.1.1')
+        self.assertEqual(public_net_info['broadcast'], '77.1.1.255')
+
         self.assertEqual(public_net_info['ips'], [{'ip': '77.1.1.2',
                                             'netmask': '255.255.0.0',
                                             'enabled': '1'}])
@@ -148,13 +153,13 @@ class TestAllocateForInstance(test.TestCase):
 
         network = db_api.network_create_safe(admin_context,
                                              dict(project_id="project1",
-                                                  cidr_v6="fe::/64"))
+                                                  cidr_v6="fe::/96"))
 
         self.mox.StubOutWithMock(melange_client, 'allocate_ip')
         allocated_v4ip = dict(address="10.1.1.2", netmask="255.255.255.0",
-                              gateway="10.1.1.1")
+                              gateway="10.1.1.1", broadcast="10.1.1.255")
         allocated_v6ip = dict(address="fe::2", netmask="f:f:f:f::",
-                              gateway="fe::1")
+                              gateway="fe::1", broadcast="fe::ffff:ffff")
 
         melange_client.allocate_ip(network.id, IgnoreArg(),
                                    project_id="project1",
@@ -176,6 +181,7 @@ class TestAllocateForInstance(test.TestCase):
                                             'netmask': 'f:f:f:f::',
                                             'enabled': '1'}])
         self.assertEqual(net_info['gateway'], "10.1.1.1")
+        self.assertEqual(net_info['broadcast'], "10.1.1.255")
         self.assertEqual(net_info['gateway6'], "fe::1")
 
     def _stub_out_mac_address_generation(self, stub_mac_address,

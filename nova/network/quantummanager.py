@@ -65,9 +65,6 @@ class QuantumManager(manager.FlatManager):
             net['dns2'] = dns2
             net['cidr'] = cidr
             net['multi_host'] = multi_host
-            net['netmask'] = str(project_net.netmask)
-            net['gateway'] = str(project_net[1])
-            net['broadcast'] = str(project_net.broadcast)
             net['dhcp_start'] = str(project_net[2])
             net['priority'] = int(kwargs.get("priority", 0))
             if kwargs["project_id"] not in [None, "0"]:
@@ -82,16 +79,6 @@ class QuantumManager(manager.FlatManager):
                 cidr_v6 = '%s/%s' % (fixed_net_v6[start_v6],
                                      significant_bits_v6)
                 net['cidr_v6'] = cidr_v6
-
-                project_net_v6 = netaddr.IPNetwork(cidr_v6)
-
-                if gateway_v6:
-                    # use a pre-defined gateway if one is provided
-                    net['gateway_v6'] = str(gateway_v6)
-                else:
-                    net['gateway_v6'] = str(project_net_v6[1])
-
-                net['netmask_v6'] = str(project_net_v6._prefixlen)
 
             if kwargs.get('vpn', False):
                 # this bit here is for vlan-manager
@@ -135,21 +122,15 @@ class QuantumManager(manager.FlatManager):
                     LOG.info(_("Quantum network uuid for network"
                          " \"%(private_net_name)s\": %(net_uuid)s" % locals()))
 
-            # None if network with cidr or cidr_v6 already exists
             network = self.db.network_create_safe(context, net)
-
             project_id = kwargs.get("project_id", None)
             if project_id == '0':
                 project_id = None
-            if network:
-                melange.create_block(network['id'], network['cidr'],
-                                     project_id)
-                if network['cidr_v6']:
-                    melange.create_block(network['id'], network['cidr_v6'],
-                                         project_id)
-            else:
-                raise ValueError(_('Network with cidr %s already exists') %
-                                 cidr)
+
+            if cidr:
+                melange.create_block(network['id'], cidr, project_id)
+            if cidr_v6:
+                melange.create_block(network['id'], cidr_v6, project_id)
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
                             **kwargs):
@@ -164,8 +145,6 @@ class QuantumManager(manager.FlatManager):
                                        mac_address=vif['address'])
 
         return dict((vif['id'], allocate_ip(vif))  for vif in vifs)
-        # for network in networks:
-        #     self.allocate_fixed_ip(context, instance_id, network)
 
     def _get_networks_for_instance(self, context, instance_id, project_id):
         """Determine & return which networks an instance should connect to."""
@@ -248,8 +227,7 @@ class QuantumManager(manager.FlatManager):
         # TODO(tr3buchet) should handle floating IPs as well?
         #fixed_ips = self.db.fixed_ip_get_by_instance(context, instance_id)
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
-        flavor = self.db.instance_type_get(context,
-                                                 instance_type_id)
+        flavor = self.db.instance_type_get(context, instance_type_id)
         network_info = []
         # a vif has an address, instance_id, and network_id
         # it is also joined to the instance and network given by those IDs
@@ -278,7 +256,7 @@ class QuantumManager(manager.FlatManager):
             info = {
                 'label': network['label'],
                 'gateway': v4_ips[0]['gateway'],
-                'broadcast': network['broadcast'],
+                'broadcast': v4_ips[0]['broadcast'],
                 'mac': vif['address'],
                 'rxtx_cap': flavor['rxtx_cap'],
                 'dns': [network['dns1']],
