@@ -399,9 +399,10 @@ class NetworkManager(manager.SchedulerDependentManager):
                                                                   project_id)
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
-        ips = self._allocate_fixed_ips(admin_context, instance_id, host, networks,
-                                       vpn=vpn)
-        return self.get_instance_nw_info(context, instance_id, type_id, host, ips=ips)
+        ips = self._allocate_fixed_ips(admin_context, instance_id,
+                                       host, networks, vpn=vpn)
+        return self.get_instance_nw_info(context, instance_id,
+                                         type_id, host, ips=ips)
 
     def deallocate_for_instance(self, context, **kwargs):
         """Handles deallocating various network resources for an instance.
@@ -678,6 +679,24 @@ class NetworkManager(manager.SchedulerDependentManager):
             else:
                 raise ValueError(_('Network with cidr %s already exists') %
                                    cidr)
+
+    def get_ips(self, interface):
+        ips = list(self._extract_ipv4_addresses(interface))
+        v6_ips = self._extract_ipv6_address(interface)
+        if v6_ips is not None:
+            ips.append(v6_ips)
+        return ips
+
+    def _extract_ipv4_addresses(self, interface):
+        for fixed_ip in interface['fixed_ips']:
+            yield dict(address=fixed_ip['address'], version=4)
+            for floating_ip in fixed_ip.get('floating_ips', []):
+                yield dict(address=floating_ip['address'], version=4)
+
+    def _extract_ipv6_address(self, interface):
+        fixed_ipv6 = interface.get('fixed_ipv6')
+        if fixed_ipv6 is not None:
+            return dict(address=fixed_ipv6, version=6)
 
     @property
     def _bottom_reserved_ips(self):  # pylint: disable=R0201

@@ -23,7 +23,7 @@ from nova import flags
 from nova import log as logging
 from nova import rpc
 from nova.db import base
-
+from nova import utils
 
 FLAGS = flags.FLAGS
 LOG = logging.getLogger('nova.network')
@@ -48,6 +48,10 @@ class API(base.Base):
     def get_vifs_by_instance(self, context, instance_id):
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
         return vifs
+
+    def get_ips(self, interface):
+        network_manager = utils.import_object(FLAGS.network_manager)
+        return network_manager.get_ips(interface)
 
     def allocate_floating_ip(self, context):
         """Adds a floating ip to a project."""

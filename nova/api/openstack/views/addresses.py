@@ -18,6 +18,7 @@
 from nova import flags
 from nova import utils
 from nova.api.openstack import common
+from nova import network
 
 FLAGS = flags.FLAGS
 
@@ -53,37 +54,28 @@ class ViewBuilderV11(ViewBuilder):
             if network_label not in networks:
                 networks[network_label] = []
 
-            ip_addresses = list(self._extract_ipv4_addresses(interface))
+            ip_addresses = [self._build_ip_entity(ip)
+                            for ip in self._get_ips(interface)]
 
-            if FLAGS.use_ipv6:
-                ipv6_address = self._extract_ipv6_address(interface)
-                if ipv6_address is not None:
-                    ip_addresses.append(ipv6_address)
+            if not FLAGS.use_ipv6:
+                ip_addresses = filter(lambda ip: ip['version'] == 4,
+                                      ip_addresses)
 
             networks[network_label].extend(ip_addresses)
 
         return networks
 
+    def _get_ips(self, interface):
+        network_api = network.API()
+        return network_api.get_ips(interface)
+
     def build_network(self, interfaces, network_label):
         for interface in interfaces:
             if interface['network']['label'] == network_label:
-                ips = list(self._extract_ipv4_addresses(interface))
-                ipv6 = self._extract_ipv6_address(interface)
-                if ipv6 is not None:
-                    ips.append(ipv6)
+                ips = [self._build_ip_entity(ip)
+                       for ip in self._get_ips(interface)]
                 return {network_label: ips}
         return None
 
-    def _extract_ipv4_addresses(self, interface):
-        for fixed_ip in interface['fixed_ips']:
-            yield self._build_ip_entity(fixed_ip['address'], 4)
-            for floating_ip in fixed_ip.get('floating_ips', []):
-                yield self._build_ip_entity(floating_ip['address'], 4)
-
-    def _extract_ipv6_address(self, interface):
-        fixed_ipv6 = interface.get('fixed_ipv6')
-        if fixed_ipv6 is not None:
-            return self._build_ip_entity(fixed_ipv6, 6)
-
-    def _build_ip_entity(self, address, version):
-        return {'addr': address, 'version': version}
+    def _build_ip_entity(self, ip):
+        return {'addr': ip['address'], 'version': ip['version']}
