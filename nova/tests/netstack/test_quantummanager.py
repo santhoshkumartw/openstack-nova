@@ -201,6 +201,25 @@ class TestAllocateForInstance(test.TestCase):
         network_manager.generate_mac_address().AndReturn(stub_mac_address)
 
 
+class TestGetIps(test.TestCase):
+
+    def test_get_all_allocated_ips_for_an_interface(self):
+        quantum_mgr = QuantumManager()
+        interface = dict(network_id="network123", id="vif_id",
+                         network=dict(project_id="project1"))
+        self.mox.StubOutWithMock(melange_client, 'get_allocated_ips')
+        allocated_v4ip = dict(address="10.1.1.2", version=4)
+        allocated_v6ip = dict(address="fe::2", version=6)
+
+        melange_client.get_allocated_ips("network123", "vif_id",
+                                         project_id="project1").AndReturn([
+            allocated_v4ip, allocated_v6ip])
+        self.mox.ReplayAll()
+
+        ips = quantum_mgr.get_ips(interface)
+        self.assertEqual(ips, [allocated_v4ip, allocated_v6ip])
+
+
 def create_quantum_network(**kwargs):
     default_params = dict(context=context.get_admin_context(),
                           label="label",

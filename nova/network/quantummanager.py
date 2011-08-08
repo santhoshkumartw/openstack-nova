@@ -281,3 +281,9 @@ class QuantumManager(manager.FlatManager):
 
         return manager.FlatManager.deallocate_for_instance(self,
                                                         context, **kwargs)
+
+    def get_ips(self, interface):
+        project_id = interface['network']['project_id']
+        return melange.get_allocated_ips(interface['network_id'],
+                                        interface['id'],
+                                        project_id=project_id)

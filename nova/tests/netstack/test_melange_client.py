@@ -97,6 +97,39 @@ class TestAllocateIp(test.TestCase):
         self.assertEqual(ip_addresses, [{'id': "123"}])
 
 
+class TestGetAllocatedIps(test.TestCase):
+
+    def test_gets_all_allocated_ips_with_project_id(self):
+        network_id = "network123"
+        vif_id = "vif1"
+        mock_client = setup_mock_client(self.mox)
+        stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
+        mock_client.get("/v0.1/ipam/tenants/tenant321/networks/network123/"
+                         "ports/vif1/ip_allocations",
+                         headers=json_content_type()).AndReturn(stub_response)
+
+        self.mox.ReplayAll()
+
+        ip_addresses = melange_client.get_allocated_ips(network_id, vif_id,
+                                                        project_id="tenant321")
+        self.assertEqual(ip_addresses, [{'id': "123"}])
+
+    def test_gets_all_allocated_ips_without_project_id(self):
+        network_id = "network123"
+        vif_id = "vif1"
+        mock_client = setup_mock_client(self.mox)
+        stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
+        mock_client.get("/v0.1/ipam/networks/network123/"
+                         "ports/vif1/ip_allocations",
+                         headers=json_content_type()).AndReturn(stub_response)
+
+        self.mox.ReplayAll()
+
+        ip_addresses = melange_client.get_allocated_ips(network_id, vif_id,
+                                                        project_id=None)
+        self.assertEqual(ip_addresses, [{'id': "123"}])
+
+
 def setup_mock_client(mox):
     mock_client = mox.CreateMockAnything()
     mox.StubOutWithMock(melange_client, 'Client')
