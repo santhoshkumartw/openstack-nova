@@ -21,6 +21,7 @@
 
 from nova import flags
 from nova import log as logging
+from nova.network import quantum
 from nova.virt.vif import VIFDriver
 from nova.virt.xenapi.network_utils import NetworkHelper
 
@@ -34,17 +35,12 @@ LOG = logging.getLogger("nova.virt.xenapi.vif")
 class XenAPIBridgeDriver(VIFDriver):
     """VIF Driver for XenAPI that uses XenAPI to create Networks."""
 
-    def find_integration_bridge(self):
-        # TODO(bgh): we need a better way of figuring out what this is on the
-        # xenserver.
-        return FLAGS.flat_network_bridge
-
     def plug(self, xenapi_session, vm_ref, instance, device, network,
                                                     network_mapping):
         if network_mapping.get('should_create_vlan'):
             network_ref = self.ensure_vlan_bridge(xenapi_session, network)
         else:
-            bridge = self.find_integration_bridge()
+            bridge = network['bridge']
             network_ref = NetworkHelper.find_network_with_bridge(
                                         xenapi_session, bridge)
         rxtx_cap = network_mapping.pop('rxtx_cap')
@@ -140,6 +136,7 @@ class XenAPIOpenVswitchDriver(VIFDriver):
         # OVS on the hypervisor monitors this key and uses it to
         # set the iface-id attribute
         vif_rec['other_config'] = {"nicira-iface-id": vif_id}
+
         return vif_rec
 
     def unplug(self, instance, network, mapping):

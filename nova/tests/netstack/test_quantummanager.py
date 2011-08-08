@@ -82,25 +82,35 @@ class TestCreateNetworks(test.TestCase):
 
     def _stub_out_and_ignore_quantum_client_calls(self):
         self.mox.StubOutWithMock(quantum, 'create_network')
-        self.mox.StubOutWithMock(quantum, 'get_network_by_name')
         quantum.create_network(IgnoreArg(),
                              IgnoreArg()).MultipleTimes().AndReturn("network1")
-        quantum.get_network_by_name(IgnoreArg(),
-                                   IgnoreArg()).MultipleTimes().AndReturn(None)
 
 
 class TestAllocateForInstance(test.TestCase):
 
+    def setUp(self):
+        super(TestAllocateForInstance, self).setUp()
+        self.mox.StubOutWithMock(quantum, 'create_port')
+        self.mox.StubOutWithMock(quantum, 'plug_iface')
+
+        quantum.create_port(IgnoreArg(), IgnoreArg()).\
+                           MultipleTimes().AndReturn("port_id")
+        quantum.plug_iface(IgnoreArg(), IgnoreArg(),
+                           IgnoreArg(), IgnoreArg()).MultipleTimes()
+
     def test_allocates_v4_ips_from_melange(self):
         quantum_mgr = QuantumManager()
         admin_context = context.get_admin_context()
+
         instance = db_api.instance_create(admin_context, {})
 
         private_network = db_api.network_create_safe(admin_context,
-                                  dict(label='private', project_id="project1"))
+                                  dict(label='private',
+                                       project_id="project1", priority=1))
         private_noise_network = db_api.network_create_safe(admin_context,
                                   dict(label='private',
-                                       project_id="some_other_project"))
+                                       project_id="some_other_project",
+                                       priority=1))
         public_network = db_api.network_create_safe(admin_context,
                                   dict(label='public', priority=1))
 
@@ -153,7 +163,8 @@ class TestAllocateForInstance(test.TestCase):
 
         network = db_api.network_create_safe(admin_context,
                                              dict(project_id="project1",
-                                                  cidr_v6="fe::/96"))
+                                                  cidr_v6="fe::/96",
+                                                  priority=1))
 
         self.mox.StubOutWithMock(melange_client, 'allocate_ip')
         allocated_v4ip = dict(address="10.1.1.2", netmask="255.255.255.0",
