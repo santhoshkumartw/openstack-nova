@@ -230,6 +230,50 @@ class TestGetIps(test.TestCase):
         self.assertEqual(ips, [allocated_v4ip, allocated_v6ip])
 
 
+class TestGetNetworkInfo(test.TestCase):
+
+    def test_get_network_info(self):
+        quantum_mgr = QuantumManager()
+        admin_context = context.get_admin_context()
+        instance = db_api.instance_create(admin_context, {})
+
+        network1 = db_api.network_create_safe(admin_context,
+                                  dict(label='private1',
+                                       project_id="project1", priority=1))
+        network2 = db_api.network_create_safe(admin_context,
+                                  dict(label='private2',
+                                       project_id="project1", priority=2))
+        vif1 = db_api.virtual_interface_create(admin_context,
+                                         dict(address="11:22:33:44:55:66",
+                                              instance_id=instance['id'],
+                                              network_id=network1['id']))
+        vif2 = db_api.virtual_interface_create(admin_context,
+                                         dict(address="66:22:33:44:55:66",
+                                              instance_id=instance['id'],
+                                              network_id=network2['id']))
+
+        self.mox.StubOutWithMock(melange_client, 'get_allocated_ips')
+        block1 = dict(netmask="255.255.255.0", cidr="10.1.1.0/24",
+                      gateway="10.1.1.1", broadcast="10.1.1.255")
+        ip1 = dict(address="10.1.1.2", version=4, ip_block=block1)
+        block2 = dict(netmask="255.255.255.0", cidr="77.1.1.0/24",
+                      gateway="77.1.1.1", broadcast="77.1.1.255")
+        ip2 = dict(address="77.1.1.2", version=4, ip_block=block2)
+
+        melange_client.get_allocated_ips(network1['id'], vif1['id'],
+                                         project_id="project1").\
+                                         AndReturn([ip1])
+
+        melange_client.get_allocated_ips(network2['id'], vif2['id'],
+                                         project_id="project1").\
+                                         AndReturn([ip2])
+
+        self.mox.ReplayAll()
+
+        quantum_mgr.get_instance_nw_info(admin_context, instance['id'],
+                                         1, None)
+
+
 class TestDeallocateForInstance(test.TestCase):
 
     def test_deallocates_ips_from_melange(self):

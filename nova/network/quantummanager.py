@@ -195,8 +195,9 @@ class QuantumManager(manager.FlatManager):
         self._allocate_mac_addresses(context, instance_id, networks)
         ips = self._allocate_fixed_ips(admin_context, instance_id, host,
                                        networks, vpn=vpn)
-        return self.get_instance_nw_info(context, instance_id, type_id,
-                                         host, ips=ips)
+        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
+        return self._construct_instance_nw_info(context, instance_id, type_id,
+                                         host, ips, vifs)
 
     def get_instance_nw_info(self, context, instance_id, instance_type_id,
                              host, ips=None, **kwargs):
@@ -208,9 +209,16 @@ class QuantumManager(manager.FlatManager):
         where network = dict containing pertinent data from a network db object
         and info = dict containing pertinent networking data
         """
+        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
+        ips = dict((vif['id'], self.get_ips(vif))  for vif in vifs)
+        return self._construct_instance_nw_info(context, instance_id,
+                                                instance_type_id,
+                                                host, ips, vifs)
+
+    def _construct_instance_nw_info(self, context, instance_id,
+                                    instance_type_id, host, ips, vifs):
         # TODO(tr3buchet) should handle floating IPs as well?
         #fixed_ips = self.db.fixed_ip_get_by_instance(context, instance_id)
-        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
         flavor = self.db.instance_type_get(context, instance_type_id)
         network_info = []
         # a vif has an address, instance_id, and network_id
