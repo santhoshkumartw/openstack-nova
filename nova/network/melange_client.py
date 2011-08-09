@@ -69,6 +69,16 @@ def get_allocated_ips(network_id, vif_id, project_id=None):
     return json.loads(response.read())['ip_addresses']
 
 
+def deallocate_ips(network_id, vif_id, project_id=None):
+    tenant_scope = "/tenants/%s" % project_id if project_id else ""
+
+    url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
+           "ports/%(vif_id)s/ip_allocations" % locals())
+
+    client = Client(FLAGS.melange_host, FLAGS.melange_port)
+    client.delete(url, headers=json_content_type)
+
+
 class Client(object):
 
     def __init__(self, host='localhost', port=8080, use_ssl=False):

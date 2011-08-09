@@ -259,6 +259,7 @@ class QuantumManager(manager.FlatManager):
         admin_context = context.elevated()
         networks = self._get_networks_for_instance(admin_context, instance_id,
                                                                   project_id)
+        vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
         for n in networks:
             vif_id = "nova-" + str(instance_id) + "-" + str(n['id'])
             # Un-attach the vif and delete the port
@@ -279,8 +280,11 @@ class QuantumManager(manager.FlatManager):
                 quantum.unplug_iface(tenant_id, quantum_net_id, port_id)
                 quantum.delete_port(tenant_id, quantum_net_id, port_id)
 
-        return manager.FlatManager.deallocate_for_instance(self,
-                                                        context, **kwargs)
+            vif = filter(lambda vif: vif['network_id'] == n['id'], vifs)[0]
+            melange.deallocate_ips(n['id'], vif['id'],
+                                   project_id=n['project_id'])
+
+            self.db.virtual_interface_delete_by_instance(context, instance_id)
 
     def get_ips(self, interface):
         project_id = interface['network']['project_id']

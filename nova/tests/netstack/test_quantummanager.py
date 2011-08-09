@@ -220,6 +220,62 @@ class TestGetIps(test.TestCase):
         self.assertEqual(ips, [allocated_v4ip, allocated_v6ip])
 
 
+class TestDeallocateForInstance(test.TestCase):
+
+    def test_deallocates_ips_from_melange(self):
+        quantum_mgr = QuantumManager()
+        admin_context = context.get_admin_context()
+        project_id = "project1"
+
+        instance_id = db_api.instance_create(admin_context, dict())['id']
+        network1 = db_api.network_create_safe(admin_context,
+                                             dict(instance_id=instance_id,
+                                                  priority=1,
+                                                  project_id=project_id))
+        network2 = db_api.network_create_safe(admin_context,
+                                             dict(instance_id=instance_id,
+                                                  priority=2,
+                                                  project_id=project_id))
+
+        vif1 = db_api.virtual_interface_create(admin_context,
+                                              dict(instance_id=instance_id,
+                                              network_id=network1['id'],
+                                              project_id=project_id))
+        vif2 = db_api.virtual_interface_create(admin_context,
+                                              dict(instance_id=instance_id,
+                                              network_id=network2['id'],
+                                              project_id=project_id))
+        self._setup_quantum_mocks()
+
+        self.mox.StubOutWithMock(melange_client, "deallocate_ips")
+        melange_client.deallocate_ips(network1['id'], vif1['id'],
+                                      project_id=project_id)
+        melange_client.deallocate_ips(network2['id'], vif2['id'],
+                                      project_id=project_id)
+
+        self.mox.ReplayAll()
+
+        quantum_mgr.deallocate_for_instance(admin_context,
+                                            instance_id=instance_id,
+                                            project_id=project_id)
+
+        vifs_left = db_api.virtual_interface_get_by_instance(admin_context,
+                                                             instance_id)
+        self.assertEqual(len(vifs_left), 0)
+
+    def _setup_quantum_mocks(self):
+        self.mox.StubOutWithMock(quantum, "get_port_by_attachment")
+        self.mox.StubOutWithMock(quantum, "unplug_iface")
+        self.mox.StubOutWithMock(quantum, "delete_port")
+
+        quantum.get_port_by_attachment(IgnoreArg(), IgnoreArg(), IgnoreArg()).\
+                                           MultipleTimes().AndReturn("port_id")
+        quantum.unplug_iface(IgnoreArg(), IgnoreArg(), IgnoreArg()).\
+                                          MultipleTimes()
+        quantum.delete_port(IgnoreArg(), IgnoreArg(), IgnoreArg()).\
+                                         MultipleTimes()
+
+
 def create_quantum_network(**kwargs):
     default_params = dict(context=context.get_admin_context(),
                           label="label",
