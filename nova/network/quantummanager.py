@@ -219,9 +219,9 @@ class QuantumManager(manager.FlatManager):
             ips_for_vif = ips[vif["id"]]
             LOG.debug(ips_for_vif)
             v4_ips = [ip for ip in ips_for_vif
-                      if ip['version'] == "4"]
+                      if ip['version'] == 4]
             v6_ips = [ip for ip in ips_for_vif
-                      if ip['version'] == "6"]
+                      if ip['version'] == 6]
             v4ip_block = v4_ips[0]['ip_block']
             network = vif['network']
 
