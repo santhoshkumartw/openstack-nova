@@ -74,7 +74,6 @@ class QuantumManager(manager.FlatManager):
             net['bridge_interface'] = bridge_interface
             net['dns1'] = dns1
             net['dns2'] = dns2
-            net['cidr'] = cidr
             net['multi_host'] = multi_host
             net['dhcp_start'] = str(project_net[2])
             net['priority'] = int(kwargs["priority"])
@@ -89,7 +88,6 @@ class QuantumManager(manager.FlatManager):
                 start_v6 = index * network_size_v6
                 cidr_v6 = '%s/%s' % (fixed_net_v6[start_v6],
                                      significant_bits_v6)
-                net['cidr_v6'] = cidr_v6
 
             if kwargs.get('vpn', False):
                 # this bit here is for vlan-manager
@@ -221,35 +219,54 @@ class QuantumManager(manager.FlatManager):
             ips_for_vif = ips[vif["id"]]
             LOG.debug(ips_for_vif)
             v4_ips = [ip for ip in ips_for_vif
-                      if netaddr.IPAddress(ip["address"]).version == 4]
+                      if ip['version'] == "4"]
             v6_ips = [ip for ip in ips_for_vif
-                      if netaddr.IPAddress(ip["address"]).version == 6]
+                      if ip['version'] == "6"]
+            v4ip_block = v4_ips[0]['ip_block']
             network = vif['network']
 
             # TODO(tr3buchet) eventually "enabled" should be determined
-            def ip_dict(ip):
+            def ip_dict(ip, netmask=None):
                 return {
-                    "ip": ip["address"],
-                    "netmask": ip["netmask"],
+                    "ip": ip['address'],
+                    "netmask": (netmask if netmask
+                                else ip['ip_block']['netmask']),
                     "enabled": "1"}
+
+            def ip6_dict(ip):
+                block = netaddr.IPNetwork(ip['ip_block']['cidr'])
+                return ip_dict(ip, netmask=block._prefixlen)
 
             network_dict = {
                 'bridge': network['bridge'],
                 'id': network['id'],
-                'cidr': network['cidr'],
-                'cidr_v6': network['cidr_v6'],
-                'injected': True}
+                'cidr': v4ip_block['cidr'],
+                'injected': True,
+                'vlan': network['vlan'],
+                'bridge_interface': network['bridge_interface'],
+                'multi_host': network['multi_host']}
             info = {
                 'label': network['label'],
-                'gateway': v4_ips[0]['gateway'],
-                'broadcast': v4_ips[0]['broadcast'],
+                'gateway': v4ip_block['gateway'],
+                'broadcast': v4ip_block['broadcast'],
                 'mac': vif['address'],
                 'rxtx_cap': flavor['rxtx_cap'],
-                'dns': [network['dns1']],
-                'ips': [ip_dict(ip) for ip in v4_ips]}
+                'dns': [],
+                'ips': [ip_dict(ip) for ip in v4_ips],
+                'should_create_bridge': self.SHOULD_CREATE_BRIDGE,
+                'should_create_vlan': self.SHOULD_CREATE_VLAN}
+
             if v6_ips:
-                info['ip6s'] = [ip_dict(ip) for ip in v6_ips]
-                info['gateway6'] = v6_ips[0]['gateway']
+                v6ip_block = v6_ips[0]['ip_block']
+                info['ip6s'] = [ip6_dict(ip) for ip in v6_ips]
+                info['gateway6'] = v6ip_block['gateway']
+                network_dict['cidr_v6'] = v6ip_block['cidr']
+
+            if network['dns1']:
+                info['dns'].append(network['dns1'])
+            if network['dns2']:
+                info['dns'].append(network['dns2'])
+
             network_info.append((network_dict, info))
         return network_info
 
