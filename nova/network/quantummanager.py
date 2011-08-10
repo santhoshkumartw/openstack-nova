@@ -200,7 +200,7 @@ class QuantumManager(manager.FlatManager):
                                          host, ips, vifs)
 
     def get_instance_nw_info(self, context, instance_id, instance_type_id,
-                             host, ips=None, **kwargs):
+                             host, **kwargs):
         """Creates network info list for instance.
 
         called by allocate_for_instance and netowrk_api
@@ -309,7 +309,7 @@ class QuantumManager(manager.FlatManager):
             melange.deallocate_ips(n['id'], vif['id'],
                                    project_id=n['project_id'])
 
-            self.db.virtual_interface_delete_by_instance(context, instance_id)
+        self.db.virtual_interface_delete_by_instance(context, instance_id)
 
     def get_ips(self, interface):
         project_id = interface['network']['project_id']
