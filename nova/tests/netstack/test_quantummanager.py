@@ -40,18 +40,33 @@ class TestCreateNetworks(test.TestCase):
 
     def test_creates_network_sized_v4_subnet_in_melange(self):
         self.flags(use_ipv6=False)
-        melange_client.create_block(IgnoreArg(), "10.1.1.0/26", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/26", "project1",
+                                    None, None)
         self.mox.ReplayAll()
 
         self._create_quantum_manager_network(cidr="10.1.1.0/24",
                                              num_networks=1, network_size=64,
                                              project_id="project1")
 
+    def test_create_v4block_with_dns(self):
+        self.flags(use_ipv6=False)
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/26", "project1",
+                                    "10.2.3.4", "10.3.4.5")
+        self.mox.ReplayAll()
+
+        self._create_quantum_manager_network(cidr="10.1.1.0/24",
+                                             num_networks=1, network_size=64,
+                                             project_id="project1",
+                                             dns1="10.2.3.4", dns2="10.3.4.5")
+
     def test_creates_multiple_ipv4_melange_blocks_for_a_single_network(self):
         self.flags(use_ipv6=False)
-        melange_client.create_block(IgnoreArg(), "10.1.0.0/24", "project1")
-        melange_client.create_block(IgnoreArg(), "10.1.1.0/24", "project1")
-        melange_client.create_block(IgnoreArg(), "10.1.2.0/24", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.0.0/24",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/24",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "10.1.2.0/24",
+                                    "project1", None, None)
         self.mox.ReplayAll()
 
         self._create_quantum_manager_network(cidr="10.1.0.0/20",
@@ -61,11 +76,15 @@ class TestCreateNetworks(test.TestCase):
     def test_always_creates_64_prefix_len_ipv6_melange_blocks(self):
         self.flags(use_ipv6=True)
 
-        melange_client.create_block(IgnoreArg(), "10.1.1.0/26", "project1")
-        melange_client.create_block(IgnoreArg(), "fe::/64", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/26",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "fe::/64",
+                                    "project1", None, None)
 
-        melange_client.create_block(IgnoreArg(), "10.1.1.0/26", "project1")
-        melange_client.create_block(IgnoreArg(), "c0::/64", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/26",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "c0::/64",
+                                    "project1", None, None)
 
         self.mox.ReplayAll()
 
@@ -81,11 +100,15 @@ class TestCreateNetworks(test.TestCase):
 
     def test_creates_multiple_melange_blocks_for_a_single_network(self):
         self.flags(use_ipv6=True)
-        melange_client.create_block(IgnoreArg(), "10.1.0.0/24", "project1")
-        melange_client.create_block(IgnoreArg(), "fe::/64", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.0.0/24",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "fe::/64",
+                                    "project1", None, None)
 
-        melange_client.create_block(IgnoreArg(), "10.1.1.0/24", "project1")
-        melange_client.create_block(IgnoreArg(), "fe:0:0:1::/64", "project1")
+        melange_client.create_block(IgnoreArg(), "10.1.1.0/24",
+                                    "project1", None, None)
+        melange_client.create_block(IgnoreArg(), "fe:0:0:1::/64",
+                                    "project1", None, None)
 
         self.mox.ReplayAll()
 
@@ -137,7 +160,8 @@ class TestAllocateForInstance(test.TestCase):
                                  priority=1))
 
         private_v4block = dict(netmask="255.255.255.0", cidr="10.1.1.0/24",
-                               gateway="10.1.1.1", broadcast="10.1.1.255")
+                               gateway="10.1.1.1", broadcast="10.1.1.255",
+                               dns1="1.2.3.4", dns2="2.3.4.5")
         private_v4ip = dict(address="10.1.1.2", version=4,
                             ip_block=private_v4block)
         melange_client.allocate_ip(private_network.id, IgnoreArg(),
@@ -154,7 +178,7 @@ class TestAllocateForInstance(test.TestCase):
                                                vpn=None)
 
         self.assertEqual(len(net_info), 1)
-        self._assert_network_info_has_ip(net_info[0], private_v4ip,
+        assert_network_info_has_ip(self, net_info[0], private_v4ip,
                                          private_network)
 
     def test_allocates_v4_ips_for_public_network(self):
@@ -166,7 +190,8 @@ class TestAllocateForInstance(test.TestCase):
                              priority=1))
 
         public_v4block = dict(netmask="255.255.255.0", cidr="10.1.1.0/24",
-                               gateway="10.1.1.1", broadcast="10.1.1.255")
+                               gateway="10.1.1.1", broadcast="10.1.1.255",
+                               dns1="1.2.3.4", dns2="2.3.4.5")
         public_v4ip = dict(address="10.1.1.2", version=4,
                             ip_block=public_v4block)
         melange_client.allocate_ip(public_network.id, IgnoreArg(),
@@ -184,7 +209,7 @@ class TestAllocateForInstance(test.TestCase):
                                                vpn="vpn_address")
 
         self.assertEqual(len(net_info), 1)
-        self._assert_network_info_has_ip(net_info[0], public_v4ip,
+        assert_network_info_has_ip(self, net_info[0], public_v4ip,
                                          public_network)
 
     def test_allocates_public_and_private_network_ips_from_melange(self):
@@ -211,8 +236,8 @@ class TestAllocateForInstance(test.TestCase):
                                                vpn=None)
         [private_net, public_net] = net_info
 
-        self._assert_network_info_has_ip(private_net, private_ip, private_nw)
-        self._assert_network_info_has_ip(public_net, public_ip, public_nw)
+        assert_network_info_has_ip(self, private_net, private_ip, private_nw)
+        assert_network_info_has_ip(self, public_net, public_ip, public_nw)
 
     def test_allocates_v6_ips_from_melange(self):
         quantum_mgr = QuantumManager()
@@ -224,7 +249,8 @@ class TestAllocateForInstance(test.TestCase):
                                                   priority=1))
 
         v4_block = dict(netmask="255.255.255.0", cidr="10.1.1.0/24",
-                               gateway="10.1.1.1", broadcast="10.1.1.255")
+                               gateway="10.1.1.1", broadcast="10.1.1.255",
+                               dns1="1.2.3.4", dns2="2.3.4.5")
         allocated_v4ip = dict(address="10.1.1.2", version=4,
                               ip_block=v4_block)
 
@@ -247,7 +273,7 @@ class TestAllocateForInstance(test.TestCase):
                                                vpn="vpn_address")
         vif_config_net_params = net_info[1]
 
-        self._assert_network_info_has_ip(net_info, allocated_v4ip, network)
+        assert_network_info_has_ip(self, net_info, allocated_v4ip, network)
         self.assertEqual(vif_config_net_params['ip6s'],
                          [{'ip': 'fe::2',
                            'netmask': v6_block_prefix_length,
@@ -276,7 +302,8 @@ class TestAllocateForInstance(test.TestCase):
                                        project_id="project1", priority=1))
 
         block = dict(netmask=ip_block.netmask, cidr=cidr, gateway=ip_block[1],
-                     broadcast=ip_block.broadcast)
+                     broadcast=ip_block.broadcast, dns1="1.2.3.4",
+                     dns2="2.3.4.5")
         ip = dict(address=address, version=ip_block.version, ip_block=block)
 
         melange_client.allocate_ip(network.id, IgnoreArg(),
@@ -284,22 +311,6 @@ class TestAllocateForInstance(test.TestCase):
                                    mac_address=IgnoreArg())\
                                    .InAnyOrder().AndReturn([ip])
         return network, ip
-
-    def _assert_network_info_has_ip(self, actual_network_info,
-                                    expected_ip, expected_network):
-        (network_info, vif_config_net_params) = actual_network_info
-        expected_ip_block = expected_ip['ip_block']
-
-        self.assertEqual(vif_config_net_params['label'],
-                         expected_network['label'])
-        self.assertEqual(vif_config_net_params['gateway'],
-                         expected_ip_block['gateway'])
-        self.assertEqual(vif_config_net_params['broadcast'],
-                         expected_ip_block['broadcast'])
-        self.assertEqual(vif_config_net_params['ips'],
-                         [{'ip': expected_ip['address'],
-                           'netmask': expected_ip_block['netmask'],
-                           'enabled': '1'}])
 
 
 class TestGetIps(test.TestCase):
@@ -348,10 +359,12 @@ class TestGetNetworkInfo(test.TestCase):
 
         self.mox.StubOutWithMock(melange_client, 'get_allocated_ips')
         block1 = dict(netmask="255.255.255.0", cidr="10.1.1.0/24",
-                      gateway="10.1.1.1", broadcast="10.1.1.255")
+                      gateway="10.1.1.1", broadcast="10.1.1.255",
+                      dns1="1.2.3.4", dns2="2.3.4.5")
         ip1 = dict(address="10.1.1.2", version=4, ip_block=block1)
         block2 = dict(netmask="255.255.255.0", cidr="77.1.1.0/24",
-                      gateway="77.1.1.1", broadcast="77.1.1.255")
+                      gateway="77.1.1.1", broadcast="77.1.1.255",
+                      dns1="1.2.3.4", dns2="2.3.4.5")
         ip2 = dict(address="77.1.1.2", version=4, ip_block=block2)
 
         melange_client.get_allocated_ips(network1['id'], vif1['id'],
@@ -364,8 +377,10 @@ class TestGetNetworkInfo(test.TestCase):
 
         self.mox.ReplayAll()
 
-        quantum_mgr.get_instance_nw_info(admin_context, instance['id'],
-                                         1, None)
+        net_info = quantum_mgr.get_instance_nw_info(admin_context,
+                                                    instance['id'], 1, None)
+        assert_network_info_has_ip(self, net_info[0], ip1, network1)
+        assert_network_info_has_ip(self, net_info[1], ip2, network2)
 
 
 class TestDeallocateForInstance(test.TestCase):
@@ -422,3 +437,21 @@ class TestDeallocateForInstance(test.TestCase):
                                           MultipleTimes()
         quantum.delete_port(IgnoreArg(), IgnoreArg(), IgnoreArg()).\
                                          MultipleTimes()
+
+
+def assert_network_info_has_ip(test, actual_network_info,
+                               expected_ip, expected_network):
+    (network_info, vif_config_net_params) = actual_network_info
+    expected_ip_block = expected_ip['ip_block']
+    expected_dns = [expected_ip_block['dns1'], expected_ip_block['dns2']]
+    test.assertEqual(vif_config_net_params['label'],
+                     expected_network['label'])
+    test.assertEqual(vif_config_net_params['gateway'],
+                     expected_ip_block['gateway'])
+    test.assertEqual(vif_config_net_params['broadcast'],
+                     expected_ip_block['broadcast'])
+    test.assertEqual(vif_config_net_params['dns'], expected_dns)
+    test.assertEqual(vif_config_net_params['ips'],
+                     [{'ip': expected_ip['address'],
+                       'netmask': expected_ip_block['netmask'],
+                       'enabled': '1'}])

@@ -47,14 +47,14 @@ def allocate_ip(network_id, vif_id, project_id=None, mac_address=None):
     return json.loads(response.read())['ip_addresses']
 
 
-def create_block(network_id, cidr, project_id=None):
+def create_block(network_id, cidr, project_id=None, dns1=None, dns2=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
     url = "/v0.1/ipam%(tenant_scope)s/ip_blocks" % locals()
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
     req_params = dict(ip_block=dict(cidr=cidr, network_id=network_id,
-                                    type='private'))
+                                    type='private', dns1=dns1, dns2=dns2))
     client.post(url, body=json.dumps(req_params), headers=json_content_type)
 
 

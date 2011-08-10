@@ -72,8 +72,6 @@ class QuantumManager(manager.FlatManager):
             net = {}
             net['bridge'] = bridge
             net['bridge_interface'] = bridge_interface
-            net['dns1'] = dns1
-            net['dns2'] = dns2
             net['multi_host'] = multi_host
             net['dhcp_start'] = str(project_net[2])
             net['priority'] = int(kwargs["priority"])
@@ -91,8 +89,6 @@ class QuantumManager(manager.FlatManager):
 
             if kwargs.get('vpn', False):
                 # this bit here is for vlan-manager
-                del net['dns1']
-                del net['dns2']
                 vlan = kwargs['vlan_start'] + index
                 net['vpn_private_address'] = str(project_net[2])
                 net['dhcp_start'] = str(project_net[3])
@@ -133,9 +129,11 @@ class QuantumManager(manager.FlatManager):
                 project_id = None
 
             if cidr:
-                melange.create_block(network['id'], cidr, project_id)
+                melange.create_block(network['id'], cidr, project_id,
+                                     dns1, dns2)
             if cidr_v6:
-                melange.create_block(network['id'], cidr_v6, project_id)
+                melange.create_block(network['id'], cidr_v6, project_id,
+                                     dns1, dns2)
 
     def _allocate_fixed_ips(self, context, instance_id, host, networks,
                             **kwargs):
@@ -259,7 +257,7 @@ class QuantumManager(manager.FlatManager):
                 'broadcast': v4ip_block['broadcast'],
                 'mac': vif['address'],
                 'rxtx_cap': flavor['rxtx_cap'],
-                'dns': [],
+                'dns': [v4ip_block['dns1'], v4ip_block['dns2']],
                 'ips': [ip_dict(ip) for ip in v4_ips],
                 'should_create_bridge': self.SHOULD_CREATE_BRIDGE,
                 'should_create_vlan': self.SHOULD_CREATE_VLAN}

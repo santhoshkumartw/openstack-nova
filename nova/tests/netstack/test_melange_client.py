@@ -33,17 +33,21 @@ class TestCreateBlock(test.TestCase):
         network_id = "netwok123"
         cidr = "10.0.0.0/24"
         project_id = "project1"
+        dns1 = "10.1.2.3"
+        dns2 = "10.2.3.4"
         mock_client = setup_mock_client(self.mox)
         req_body = dict(ip_block=dict(cidr=cidr,
                                       network_id=network_id,
-                                      type='private'))
+                                      type='private',
+                                      dns1=dns1, dns2=dns2))
         mock_client.post("/v0.1/ipam/tenants/project1/ip_blocks",
                          body=json.dumps(req_body),
                          headers=json_content_type()).AndReturn(None)
 
         self.mox.ReplayAll()
 
-        melange_client.create_block(network_id, cidr, project_id=project_id)
+        melange_client.create_block(network_id, cidr, project_id=project_id,
+                                    dns1=dns1, dns2=dns2)
 
     def test_create_block_wihtout_project_id(self):
         network_id = "network123"
@@ -51,7 +55,8 @@ class TestCreateBlock(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         req_body = dict(ip_block=dict(cidr=cidr,
                                       network_id=network_id,
-                                      type='private'))
+                                      type='private',
+                                      dns1=None, dns2=None))
         mock_client.post("/v0.1/ipam/ip_blocks",
                          body=json.dumps(req_body),
                          headers=json_content_type()).AndReturn(None)
