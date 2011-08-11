@@ -40,7 +40,7 @@ def allocate_ip(network_id, vif_id, project_id=None, mac_address=None):
     request_body = (json.dumps(dict(network=dict(mac_address=mac_address)))
                     if mac_address else None)
     url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
-           "ports/%(vif_id)s/ip_allocations" % locals())
+           "interfaces/%(vif_id)s/ip_allocations" % locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
     response = client.post(url, body=request_body, headers=json_content_type)
@@ -62,7 +62,7 @@ def get_allocated_ips(network_id, vif_id, project_id=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
     url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
-           "ports/%(vif_id)s/ip_allocations" % locals())
+           "interfaces/%(vif_id)s/ip_allocations" % locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
     response = client.get(url, headers=json_content_type)
@@ -73,7 +73,7 @@ def deallocate_ips(network_id, vif_id, project_id=None):
     tenant_scope = "/tenants/%s" % project_id if project_id else ""
 
     url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
-           "ports/%(vif_id)s/ip_allocations" % locals())
+           "interfaces/%(vif_id)s/ip_allocations" % locals())
 
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
     client.delete(url, headers=json_content_type)

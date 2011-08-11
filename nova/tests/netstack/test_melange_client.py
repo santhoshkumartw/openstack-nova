@@ -77,7 +77,7 @@ class TestAllocateIp(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/tenants/project2/networks/network1/"
-                         "ports/vif1/ip_allocations", body=request_body,
+                         "interfaces/vif1/ip_allocations", body=request_body,
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
@@ -92,7 +92,7 @@ class TestAllocateIp(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/networks/network333/"
-                         "ports/vif1/ip_allocations", body=None,
+                         "interfaces/vif1/ip_allocations", body=None,
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
@@ -110,7 +110,7 @@ class TestGetAllocatedIps(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.get("/v0.1/ipam/tenants/tenant321/networks/network123/"
-                         "ports/vif1/ip_allocations",
+                         "interfaces/vif1/ip_allocations",
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
@@ -125,7 +125,7 @@ class TestGetAllocatedIps(test.TestCase):
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.get("/v0.1/ipam/networks/network123/"
-                         "ports/vif1/ip_allocations",
+                         "interfaces/vif1/ip_allocations",
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
@@ -143,7 +143,7 @@ class TestDeAllocateIps(test.TestCase):
         project_id = "project2"
         mock_client = setup_mock_client(self.mox)
         mock_client.delete("/v0.1/ipam/tenants/project2/networks/network1/"
-                           "ports/vif1/ip_allocations",
+                           "interfaces/vif1/ip_allocations",
                            headers=json_content_type())
         self.mox.ReplayAll()
 
@@ -155,7 +155,7 @@ class TestDeAllocateIps(test.TestCase):
         vif_id = "vif1"
         mock_client = setup_mock_client(self.mox)
         mock_client.delete("/v0.1/ipam/networks/network1/"
-                           "ports/vif1/ip_allocations",
+                           "interfaces/vif1/ip_allocations",
                            headers=json_content_type())
         self.mox.ReplayAll()
 
