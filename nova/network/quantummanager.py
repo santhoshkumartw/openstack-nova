@@ -257,7 +257,7 @@ class QuantumManager(manager.FlatManager):
                 'broadcast': v4ip_block['broadcast'],
                 'mac': vif['address'],
                 'rxtx_cap': flavor['rxtx_cap'],
-                'dns': [v4ip_block['dns1'], v4ip_block['dns2']],
+                'dns': filter(None, [v4ip_block['dns1'], v4ip_block['dns2']]),
                 'ips': [ip_dict(ip) for ip in v4_ips],
                 'should_create_bridge': self.SHOULD_CREATE_BRIDGE,
                 'should_create_vlan': self.SHOULD_CREATE_VLAN}
@@ -267,11 +267,6 @@ class QuantumManager(manager.FlatManager):
                 info['ip6s'] = [ip6_dict(ip) for ip in v6_ips]
                 info['gateway6'] = v6ip_block['gateway']
                 network_dict['cidr_v6'] = v6ip_block['cidr']
-
-            if network['dns1']:
-                info['dns'].append(network['dns1'])
-            if network['dns2']:
-                info['dns'].append(network['dns2'])
 
             network_info.append((network_dict, info))
         return network_info

@@ -364,7 +364,7 @@ class TestGetNetworkInfo(test.TestCase):
         ip1 = dict(address="10.1.1.2", version=4, ip_block=block1)
         block2 = dict(netmask="255.255.255.0", cidr="77.1.1.0/24",
                       gateway="77.1.1.1", broadcast="77.1.1.255",
-                      dns1="1.2.3.4", dns2="2.3.4.5")
+                      dns1="1.2.3.4", dns2=None)
         ip2 = dict(address="77.1.1.2", version=4, ip_block=block2)
 
         melange_client.get_allocated_ips(network1['id'], vif1['id'],
@@ -443,7 +443,12 @@ def assert_network_info_has_ip(test, actual_network_info,
                                expected_ip, expected_network):
     (network_info, vif_config_net_params) = actual_network_info
     expected_ip_block = expected_ip['ip_block']
-    expected_dns = [expected_ip_block['dns1'], expected_ip_block['dns2']]
+    expected_dns = []
+    if expected_ip_block['dns1']:
+        expected_dns.append(expected_ip_block['dns1'])
+    if expected_ip_block['dns2']:
+        expected_dns.append(expected_ip_block['dns2'])
+
     test.assertEqual(vif_config_net_params['label'],
                      expected_network['label'])
     test.assertEqual(vif_config_net_params['gateway'],
