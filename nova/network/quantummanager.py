@@ -135,17 +135,26 @@ class QuantumManager(manager.FlatManager):
                 melange.create_block(network['id'], cidr_v6, project_id,
                                      dns1, dns2)
 
-    def _allocate_fixed_ips(self, context, instance_id, host, networks,
-                            **kwargs):
+    def _allocate_fixed_ips(self,  context, instance_id, host, networks,
+                            project_id=None, **kwargs):
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
 
-        def allocate_ip(vif):
+        def is_private_network(vif):
             network_for_vif = lambda net: net['id'] == vif['network_id']
-            project_id = filter(network_for_vif, networks)[0].project_id
+            return filter(network_for_vif, networks)[0].project_id is not None
 
-            return melange.allocate_ip(vif['network_id'],
-                                       vif['id'], project_id=project_id,
-                                       mac_address=vif['address'])
+        def allocate_ip(vif):
+        
+            if is_private_network(vif):
+                return melange.allocate_private_net_ip(
+                    vif['network_id'],
+                    vif['id'], project_id=project_id,
+                    mac_address=vif['address'])
+            
+            return melange.allocate_global_net_ip(
+                vif['network_id'],
+                vif['id'], project_id=project_id,
+                mac_address=vif['address'])
 
         return dict((vif['id'], allocate_ip(vif))  for vif in vifs)
 
@@ -192,7 +201,7 @@ class QuantumManager(manager.FlatManager):
         LOG.warn(networks)
         self._allocate_mac_addresses(context, instance_id, networks)
         ips = self._allocate_fixed_ips(admin_context, instance_id, host,
-                                       networks, vpn=vpn)
+                                       networks, vpn=vpn, project_id=project_id)
         vifs = self.db.virtual_interface_get_by_instance(context, instance_id)
         return self._construct_instance_nw_info(context, instance_id, type_id,
                                          host, ips, vifs)

@@ -35,13 +35,22 @@ flags.DEFINE_string('melange_port',
 json_content_type = {'Content-type': "application/json"}
 
 
-def allocate_ip(network_id, vif_id, project_id=None, mac_address=None):
-    tenant_scope = "/tenants/%s" % project_id if project_id else ""
-    request_body = (json.dumps(dict(network=dict(mac_address=mac_address)))
-                    if mac_address else None)
-    url = ("/v0.1/ipam%(tenant_scope)s/networks/%(network_id)s/"
+def allocate_private_net_ip(network_id, vif_id, project_id=None, mac_address=None):
+    url = ("/v0.1/ipam/tenants/%(project_id)s/networks/%(network_id)s/"
            "interfaces/%(vif_id)s/ip_allocations" % locals())
 
+    return _allocate_ip(url, project_id, mac_address)
+
+def allocate_global_net_ip(network_id, vif_id, project_id=None, mac_address=None):
+    url = ("/v0.1/ipam/networks/%(network_id)s/"
+           "interfaces/%(vif_id)s/ip_allocations" % locals())
+
+    return _allocate_ip(url, project_id, mac_address)
+
+def _allocate_ip(url, project_id, mac_address):
+    request_body = json.dumps(dict(network=dict(mac_address=mac_address,
+                                                tenant_id=project_id)))
+    
     client = Client(FLAGS.melange_host, FLAGS.melange_port)
     response = client.post(url, body=request_body, headers=json_content_type)
     return json.loads(response.read())['ip_addresses']

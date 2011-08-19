@@ -149,7 +149,8 @@ class TestAllocateForInstance(test.TestCase):
         super(TestAllocateForInstance, self).setUp()
         self.instance_id = db_api.instance_create(admin_context, {}).id
         self._stub_out_quantum_port_and_iface_create_calls()
-        self.mox.StubOutWithMock(melange_client, 'allocate_ip')
+        self.mox.StubOutWithMock(melange_client, 'allocate_private_net_ip')
+        self.mox.StubOutWithMock(melange_client, 'allocate_global_net_ip')
 
     def test_allocates_v4_ips_for_private_network(self):
         private_network = db_api.network_create_safe(admin_context,
@@ -164,9 +165,9 @@ class TestAllocateForInstance(test.TestCase):
                                dns1="1.2.3.4", dns2="2.3.4.5")
         private_v4ip = dict(address="10.1.1.2", version=4,
                             ip_block=private_v4block)
-        melange_client.allocate_ip(private_network.id, IgnoreArg(),
-                                   project_id="project1",
-                                   mac_address=IgnoreArg())\
+        melange_client.allocate_private_net_ip(private_network.id, IgnoreArg(),
+                                               project_id="project1",
+                                               mac_address=IgnoreArg())\
                                    .InAnyOrder().AndReturn([private_v4ip])
         self.mox.ReplayAll()
 
@@ -194,9 +195,9 @@ class TestAllocateForInstance(test.TestCase):
                                dns1="1.2.3.4", dns2="2.3.4.5")
         public_v4ip = dict(address="10.1.1.2", version=4,
                             ip_block=public_v4block)
-        melange_client.allocate_ip(public_network.id, IgnoreArg(),
-                                   project_id=None,
-                                   mac_address=IgnoreArg())\
+        melange_client.allocate_global_net_ip(public_network.id, IgnoreArg(),
+                                              project_id="project1",
+                                              mac_address=IgnoreArg())\
                                    .InAnyOrder().AndReturn([public_v4ip])
 
         self.mox.ReplayAll()
@@ -218,14 +219,20 @@ class TestAllocateForInstance(test.TestCase):
         private_noise_network = db_api.network_create_safe(admin_context,
                                                            network_params)
 
-        private_nw, private_ip = self._setup_network_and_melange_ip("10.1.1.2",
-                                                        "10.1.1.0/24",
-                                                        net_label="private",
-                                                        project_id="project1")
-        public_nw, public_ip = self._setup_network_and_melange_ip("77.1.1.2",
-                                                       "77.1.1.0/24",
-                                                       net_label="public",
-                                                       project_id=None)
+        private_nw, private_ip = self._setup_network("10.1.1.2", "10.1.1.0/24",
+                                                     net_label="private",
+                                                     project_id="project1")
+        melange_client.allocate_private_net_ip(private_nw.id, IgnoreArg(),
+                                               project_id="project1",
+                                               mac_address=IgnoreArg()).\
+                                               AndReturn([private_ip])
+        public_nw, public_ip = self._setup_network("77.1.1.2", "77.1.1.0/24",
+                                                   net_label="public",
+                                                   project_id=None)
+        melange_client.allocate_global_net_ip(public_nw.id, IgnoreArg(),
+                                               project_id="project1",
+                                               mac_address=IgnoreArg()).\
+                                               AndReturn([public_ip])
         self.mox.ReplayAll()
 
         net_info = QuantumManager().allocate_for_instance(admin_context,
@@ -259,9 +266,9 @@ class TestAllocateForInstance(test.TestCase):
         allocated_v6ip = dict(address="fe::2", version=6, ip_block=v6_block)
         v6_block_prefix_length = 96
 
-        melange_client.allocate_ip(network.id, IgnoreArg(),
-                                   project_id="project1",
-                                   mac_address=mac_address)\
+        melange_client.allocate_private_net_ip(network.id, IgnoreArg(),
+                                               project_id="project1",
+                                               mac_address=mac_address)\
                                    .AndReturn([allocated_v4ip, allocated_v6ip])
         self.mox.ReplayAll()
 
@@ -294,22 +301,18 @@ class TestAllocateForInstance(test.TestCase):
         quantum.plug_iface(IgnoreArg(), IgnoreArg(),
                            IgnoreArg(), IgnoreArg()).MultipleTimes()
 
-    def _setup_network_and_melange_ip(self, address, cidr,
-                                      net_label=None, project_id=None):
+    def _setup_network(self, address, cidr,
+                       net_label=None, project_id=None):
         ip_block = IPNetwork(cidr)
         network = db_api.network_create_safe(admin_context,
-                                  dict(label='private',
-                                       project_id="project1", priority=1))
+                                  dict(label=net_label,
+                                       project_id=project_id, priority=1))
 
         block = dict(netmask=ip_block.netmask, cidr=cidr, gateway=ip_block[1],
                      broadcast=ip_block.broadcast, dns1="1.2.3.4",
                      dns2="2.3.4.5")
         ip = dict(address=address, version=ip_block.version, ip_block=block)
 
-        melange_client.allocate_ip(network.id, IgnoreArg(),
-                                   project_id="project1",
-                                   mac_address=IgnoreArg())\
-                                   .InAnyOrder().AndReturn([ip])
         return network, ip
 
 

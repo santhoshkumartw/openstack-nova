@@ -49,7 +49,7 @@ class TestCreateBlock(test.TestCase):
         melange_client.create_block(network_id, cidr, project_id=project_id,
                                     dns1=dns1, dns2=dns2)
 
-    def test_create_block_wihtout_project_id(self):
+    def test_create_block_without_project_id(self):
         network_id = "network123"
         cidr = "10.0.0.0/24"
         mock_client = setup_mock_client(self.mox)
@@ -68,12 +68,13 @@ class TestCreateBlock(test.TestCase):
 
 class TestAllocateIp(test.TestCase):
 
-    def test_allocate_ip_for_a_given_project_id(self):
+    def test_allocate_private_net_ip_posts_to_tenant_scoped_allocations(self):
         network_id = "network1"
         vif_id = "vif1"
         project_id = "project2"
         mac_address = "11:22:33:44:55:66"
-        request_body = json.dumps(dict(network=dict(mac_address=mac_address)))
+        request_body = json.dumps(dict(network=dict(mac_address=mac_address,
+                                                    tenant_id=project_id)))
         mock_client = setup_mock_client(self.mox)
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/tenants/project2/networks/network1/"
@@ -82,23 +83,31 @@ class TestAllocateIp(test.TestCase):
 
         self.mox.ReplayAll()
 
-        ip_addresses = melange_client.allocate_ip(network_id, vif_id,
-                        project_id=project_id, mac_address=mac_address)
+        ip_addresses = melange_client.allocate_private_net_ip(
+            network_id, vif_id, project_id=project_id,
+            mac_address=mac_address)
         self.assertEqual(ip_addresses, [{'id': "123"}])
 
-    def test_allocate_ip_without_a_project_id(self):
+    def test_allocate_global_net_ip_posts_to_non_tenantscope_allocations(self):
         network_id = "network333"
         vif_id = "vif1"
+        project_id = "project"
+        mac_address = "11:22:33:44:55:66"
         mock_client = setup_mock_client(self.mox)
+        request_body = json.dumps(dict(network=dict(mac_address=mac_address,
+                                                    tenant_id=project_id)))
         stub_response = ResponseStub({'ip_addresses': [{'id': "123"}]})
         mock_client.post("/v0.1/ipam/networks/network333/"
-                         "interfaces/vif1/ip_allocations", body=None,
+                         "interfaces/vif1/ip_allocations", body=request_body,
                          headers=json_content_type()).AndReturn(stub_response)
 
         self.mox.ReplayAll()
 
-        ip_addresses = melange_client.allocate_ip(network_id, vif_id,
-                                                  project_id=None)
+        ip_addresses = melange_client.allocate_global_net_ip(
+            network_id, vif_id,
+            project_id=project_id,
+            mac_address=mac_address)
+
         self.assertEqual(ip_addresses, [{'id': "123"}])
 
 
